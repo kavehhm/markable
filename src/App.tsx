@@ -75,7 +75,7 @@ const prepTabs: Array<{ id: PrepTabId; label: string; detail: string; Icon: Luci
   { id: "cases", label: "Cases", detail: "Work through interview-style decisions.", Icon: ClipboardList },
 ];
 
-type InferencePhase = "market" | "guess" | "done";
+type InferencePhase = "ready" | "market" | "guess" | "done";
 type MarketResponse = "buy" | "sell" | "hold";
 
 type InferenceMarket = {
@@ -166,10 +166,17 @@ function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
-function randomHiddenTriple(): [number, number, number] {
+const minInferenceBound = 13;
+const maxInferenceBound = 100;
+
+function randomInferenceBound() {
+  return Math.floor(Math.random() * (maxInferenceBound - minInferenceBound + 1)) + minInferenceBound;
+}
+
+function randomHiddenTriple(bound: number): [number, number, number] {
   const values = new Set<number>();
   while (values.size < 3) {
-    const value = Math.floor(Math.random() * 201) - 100;
+    const value = Math.floor(Math.random() * (bound * 2 + 1)) - bound;
     if (value !== 0) values.add(value);
   }
   return [...values] as [number, number, number];
@@ -662,8 +669,9 @@ function CaseDrill({ onAnswer }: { onAnswer: (correct: boolean, elapsedMs: numbe
 
 function InferenceGame() {
   const [gameId, setGameId] = useState(1);
-  const [hidden, setHidden] = useState<[number, number, number]>(() => randomHiddenTriple());
-  const [phase, setPhase] = useState<InferencePhase>("market");
+  const [bound, setBound] = useState(() => randomInferenceBound());
+  const [hidden, setHidden] = useState<[number, number, number]>(() => randomHiddenTriple(bound));
+  const [phase, setPhase] = useState<InferencePhase>("ready");
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(35);
   const [market, setMarket] = useState<InferenceMarket>({
@@ -680,6 +688,7 @@ function InferenceGame() {
   const windowClosedRef = useRef(false);
   const trueSum = sumValues(hidden);
   const trueProduct = productValues(hidden);
+  const boundsLabel = `[-${bound}, ${bound}]`;
   const sortedHidden = sortedValues(hidden);
   const sortedGuess = sortedValues([guess.a, guess.b, guess.c]);
   const valueError = sortedHidden.reduce((sum, value, index) => sum + Math.abs(value - sortedGuess[index]), 0);
@@ -699,9 +708,11 @@ function InferenceGame() {
   }, [guess]);
 
   function resetGame() {
+    const nextBound = randomInferenceBound();
     setGameId((current) => current + 1);
-    setHidden(randomHiddenTriple());
-    setPhase("market");
+    setBound(nextBound);
+    setHidden(randomHiddenTriple(nextBound));
+    setPhase("ready");
     setRound(1);
     setTimeLeft(35);
     setRounds([]);
@@ -712,6 +723,10 @@ function InferenceGame() {
       productAsk: 100000,
     });
     setGuess({ a: 0, b: 0, c: 0 });
+  }
+
+  function startGame() {
+    setPhase("market");
   }
 
   function submitMarket(expired = false) {
@@ -750,7 +765,7 @@ function InferenceGame() {
   }
 
   useEffect(() => {
-    if (phase === "done") return undefined;
+    if (phase === "ready" || phase === "done") return undefined;
     windowClosedRef.current = false;
     setTimeLeft(35);
     const deadline = Date.now() + 35000;
@@ -789,24 +804,39 @@ function InferenceGame() {
             <span className="section-kicker">Timed inference</span>
             <h2 id="inference-heading">Sum/Product Game</h2>
           </div>
-          <div className={cn("countdown-pill", timeLeft <= 10 && phase !== "done" && "danger")} title="Time left">
+          <div className={cn("countdown-pill", timeLeft <= 10 && phase !== "ready" && phase !== "done" && "danger")} title="Time left">
             <Timer size={17} />
-            {phase === "done" ? "Done" : `${timeLeft}s`}
+            {phase === "ready" ? "Ready" : phase === "done" ? "Done" : `${timeLeft}s`}
           </div>
         </div>
 
         <div className="game-status-grid">
-          <StatTile icon={<Search size={18} />} label="Hidden values" value="3 integers" />
-          <StatTile icon={<Clock3 size={18} />} label="Window" value="35s" tone={timeLeft <= 10 && phase !== "done" ? "bad" : "warn"} />
-          <StatTile icon={<Target size={18} />} label="Round" value={phase === "market" ? `${round}/3` : phase === "guess" ? "Guess" : "Scored"} />
+          <StatTile icon={<Search size={18} />} label="Range" value={boundsLabel} />
+          <StatTile icon={<Clock3 size={18} />} label="Window" value="35s" tone={timeLeft <= 10 && phase !== "ready" && phase !== "done" ? "bad" : "warn"} />
+          <StatTile icon={<Target size={18} />} label="Round" value={phase === "ready" ? "Ready" : phase === "market" ? `${round}/3` : phase === "guess" ? "Guess" : "Scored"} />
         </div>
+
+        {phase === "ready" ? (
+          <>
+            <div className="problem-card inference-copy">
+              <span>Ready screen</span>
+              <h3>Start when you are ready</h3>
+              <p>The values are three distinct nonzero integers in {boundsLabel}. The 35-second clock begins only after you press Start.</p>
+            </div>
+
+            <button className="primary-action" onClick={startGame}>
+              <Play size={18} />
+              Start game
+            </button>
+          </>
+        ) : null}
 
         {phase === "market" ? (
           <>
             <div className="problem-card inference-copy">
               <span>Round {round} of 3</span>
               <h3>Make both markets</h3>
-              <p>Quote a bid and ask for the sum and product of the hidden values. The counterparty will buy, hold, or sell based on the true value.</p>
+              <p>Quote sum and product markets for three distinct nonzero integers in {boundsLabel}. The counterparty reacts to the true values.</p>
             </div>
 
             <div className="market-form-grid">
@@ -868,7 +898,7 @@ function InferenceGame() {
         {phase === "done" ? (
           <div className="result-panel">
             <div>
-              <span>Hidden values</span>
+              <span>Hidden values in {boundsLabel}</span>
               <strong>{sortedHidden.map(formatInteger).join(", ")}</strong>
             </div>
             <div>
@@ -921,7 +951,7 @@ function InferenceGame() {
           ) : (
             <div>
               <span>No responses yet</span>
-              <strong>Make round 1</strong>
+              <strong>{phase === "ready" ? "Press start" : "Make round 1"}</strong>
               <p>Wide markets reveal less. Narrow markets reveal more, but they are easier to be wrong about.</p>
             </div>
           )}
