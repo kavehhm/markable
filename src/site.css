@@ -1,0 +1,112 @@
+/* Thin shared chrome that sits above both the Trainer and the Arena.
+   Deliberately neutral so it reads cleanly on the light Trainer and the
+   dark Arena alike. */
+
+.site-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+}
+
+.site-nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1480px, calc(100% - 32px));
+  margin: 0 auto;
+  height: 56px;
+}
+
+.site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.site-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #fff;
+}
+
+.site-brand-name {
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.site-links {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.site-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: #475569;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.site-link:hover {
+  color: #0f172a;
+}
+
+.site-link.active {
+  background: #0f172a;
+  color: #fff;
+}
+
+/* When the Arena is active, recolour the shared nav to match the dark shell. */
+.site-arena {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, rgba(56, 189, 248, 0.06), transparent 260px),
+    #05070b;
+}
+
+.site-arena .site-nav {
+  border-bottom: 1px solid rgba(226, 232, 240, 0.08);
+  background: rgba(5, 7, 11, 0.76);
+}
+
+.site-arena .site-brand-name {
+  color: #f4f7fb;
+}
+
+.site-arena .site-brand-mark {
+  background: linear-gradient(135deg, #38bdf8, #34d399);
+  color: #03100e;
+}
+
+.site-arena .site-links {
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.site-arena .site-link {
+  color: #94a3b8;
+}
+
+.site-arena .site-link:hover {
+  color: #f4f7fb;
+}
+
+.site-arena .site-link.active {
+  background: linear-gradient(135deg, #38bdf8, #34d399);
+  color: #03100e;
+}
