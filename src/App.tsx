@@ -18,10 +18,12 @@ import {
   Play,
   RefreshCcw,
   RotateCcw,
+  Search,
   ScrollText,
   Sigma,
   SlidersHorizontal,
   Target,
+  Timer,
   TimerReset,
   TrendingDown,
   TrendingUp,
@@ -59,7 +61,7 @@ const defaultProgress: Progress = {
 
 const progressKey = "markable-progress-v1";
 
-type PrepTabId = "quote" | "book" | "inventory" | "probability" | "math" | "concepts" | "cases";
+type PrepTabId = "quote" | "book" | "inventory" | "probability" | "math" | "inference" | "concepts" | "cases";
 type ProgressKind = "quote" | "probability" | "math" | "case";
 
 const prepTabs: Array<{ id: PrepTabId; label: string; detail: string; Icon: LucideIcon }> = [
@@ -68,9 +70,33 @@ const prepTabs: Array<{ id: PrepTabId; label: string; detail: string; Icon: Luci
   { id: "inventory", label: "Inventory", detail: "Practice skew, width, and PnL control.", Icon: SlidersHorizontal },
   { id: "probability", label: "Probability", detail: "Convert signals and fill risk into fair value.", Icon: Percent },
   { id: "math", label: "Mental Math", detail: "Drill bps, sizing, and spread arithmetic.", Icon: Calculator },
+  { id: "inference", label: "Inference Game", detail: "Quote sum/product markets and infer the hidden triple.", Icon: Search },
   { id: "concepts", label: "Concepts", detail: "Review microstructure flashcards.", Icon: NotebookTabs },
   { id: "cases", label: "Cases", detail: "Work through interview-style decisions.", Icon: ClipboardList },
 ];
+
+type InferencePhase = "market" | "guess" | "done";
+type MarketResponse = "buy" | "sell" | "hold";
+
+type InferenceMarket = {
+  sumBid: number;
+  sumAsk: number;
+  productBid: number;
+  productAsk: number;
+};
+
+type InferenceRound = InferenceMarket & {
+  round: number;
+  expired: boolean;
+  sumResponse: MarketResponse;
+  productResponse: MarketResponse;
+};
+
+type InferenceGuess = {
+  a: number;
+  b: number;
+  c: number;
+};
 
 function readProgress(): Progress {
   try {
@@ -138,6 +164,44 @@ function applyPrepResult(progress: Progress, kind: ProgressKind, correct: boolea
 
 function cn(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function randomHiddenTriple(): [number, number, number] {
+  const values = new Set<number>();
+  while (values.size < 3) {
+    const value = Math.floor(Math.random() * 201) - 100;
+    if (value !== 0) values.add(value);
+  }
+  return [...values] as [number, number, number];
+}
+
+function sumValues(values: number[]) {
+  return values.reduce((sum, value) => sum + value, 0);
+}
+
+function productValues(values: number[]) {
+  return values.reduce((product, value) => product * value, 1);
+}
+
+function formatInteger(value: number) {
+  return Math.round(value).toLocaleString();
+}
+
+function marketResponse(trueValue: number, bid: number, ask: number): MarketResponse {
+  if (bid > ask) return "hold";
+  if (trueValue > ask) return "buy";
+  if (trueValue < bid) return "sell";
+  return "hold";
+}
+
+function responseMeaning(response: MarketResponse, target: "sum" | "product") {
+  if (response === "buy") return `They bought your ${target} ask, so true ${target} is above your ask.`;
+  if (response === "sell") return `They sold your ${target} bid, so true ${target} is below your bid.`;
+  return `They held, so true ${target} is inside your market.`;
+}
+
+function sortedValues(values: number[]) {
+  return [...values].sort((a, b) => a - b);
 }
 
 function useElapsed(activeKey: number, running: boolean) {
@@ -596,6 +660,277 @@ function CaseDrill({ onAnswer }: { onAnswer: (correct: boolean, elapsedMs: numbe
   );
 }
 
+function InferenceGame() {
+  const [gameId, setGameId] = useState(1);
+  const [hidden, setHidden] = useState<[number, number, number]>(() => randomHiddenTriple());
+  const [phase, setPhase] = useState<InferencePhase>("market");
+  const [round, setRound] = useState(1);
+  const [timeLeft, setTimeLeft] = useState(35);
+  const [market, setMarket] = useState<InferenceMarket>({
+    sumBid: -50,
+    sumAsk: 50,
+    productBid: -100000,
+    productAsk: 100000,
+  });
+  const [rounds, setRounds] = useState<InferenceRound[]>([]);
+  const [guess, setGuess] = useState<InferenceGuess>({ a: 0, b: 0, c: 0 });
+  const phaseRef = useRef<InferencePhase>(phase);
+  const marketRef = useRef<InferenceMarket>(market);
+  const guessRef = useRef<InferenceGuess>(guess);
+  const windowClosedRef = useRef(false);
+  const trueSum = sumValues(hidden);
+  const trueProduct = productValues(hidden);
+  const sortedHidden = sortedValues(hidden);
+  const sortedGuess = sortedValues([guess.a, guess.b, guess.c]);
+  const valueError = sortedHidden.reduce((sum, value, index) => sum + Math.abs(value - sortedGuess[index]), 0);
+  const guessedSum = guess.a + guess.b + guess.c;
+  const guessedProduct = guess.a * guess.b * guess.c;
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  useEffect(() => {
+    marketRef.current = market;
+  }, [market]);
+
+  useEffect(() => {
+    guessRef.current = guess;
+  }, [guess]);
+
+  function resetGame() {
+    setGameId((current) => current + 1);
+    setHidden(randomHiddenTriple());
+    setPhase("market");
+    setRound(1);
+    setTimeLeft(35);
+    setRounds([]);
+    setMarket({
+      sumBid: -50,
+      sumAsk: 50,
+      productBid: -100000,
+      productAsk: 100000,
+    });
+    setGuess({ a: 0, b: 0, c: 0 });
+  }
+
+  function submitMarket(expired = false) {
+    if (phaseRef.current !== "market" || windowClosedRef.current) return;
+    windowClosedRef.current = true;
+    const current = marketRef.current;
+    const normalized = {
+      sumBid: Math.min(current.sumBid, current.sumAsk),
+      sumAsk: Math.max(current.sumBid, current.sumAsk),
+      productBid: Math.min(current.productBid, current.productAsk),
+      productAsk: Math.max(current.productBid, current.productAsk),
+    };
+    const entry: InferenceRound = {
+      ...normalized,
+      round,
+      expired,
+      sumResponse: marketResponse(trueSum, normalized.sumBid, normalized.sumAsk),
+      productResponse: marketResponse(trueProduct, normalized.productBid, normalized.productAsk),
+    };
+
+    setRounds((currentRounds) => [...currentRounds, entry]);
+    setMarket(normalized);
+
+    if (round >= 3) {
+      setPhase("guess");
+    } else {
+      setRound((currentRound) => currentRound + 1);
+    }
+  }
+
+  function submitGuess(expired = false) {
+    if (phaseRef.current !== "guess" || windowClosedRef.current) return;
+    windowClosedRef.current = true;
+    if (expired) setGuess((current) => ({ ...current }));
+    setPhase("done");
+  }
+
+  useEffect(() => {
+    if (phase === "done") return undefined;
+    windowClosedRef.current = false;
+    setTimeLeft(35);
+    const deadline = Date.now() + 35000;
+    const id = window.setInterval(() => {
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(id);
+        if (phaseRef.current === "market") submitMarket(true);
+        if (phaseRef.current === "guess") submitGuess(true);
+      }
+    }, 250);
+
+    return () => window.clearInterval(id);
+  }, [gameId, phase, round]);
+
+  function updateMarket(key: keyof InferenceMarket, value: number) {
+    setMarket((current) => ({
+      ...current,
+      [key]: Number.isFinite(value) ? value : 0,
+    }));
+  }
+
+  function updateGuess(key: keyof InferenceGuess, value: number) {
+    setGuess((current) => ({
+      ...current,
+      [key]: Number.isFinite(value) ? value : 0,
+    }));
+  }
+
+  return (
+    <div className="tab-grid inference-grid">
+      <section className="training-panel inference-panel" aria-labelledby="inference-heading">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Timed inference</span>
+            <h2 id="inference-heading">Sum/Product Game</h2>
+          </div>
+          <div className={cn("countdown-pill", timeLeft <= 10 && phase !== "done" && "danger")} title="Time left">
+            <Timer size={17} />
+            {phase === "done" ? "Done" : `${timeLeft}s`}
+          </div>
+        </div>
+
+        <div className="game-status-grid">
+          <StatTile icon={<Search size={18} />} label="Hidden values" value="3 integers" />
+          <StatTile icon={<Clock3 size={18} />} label="Window" value="35s" tone={timeLeft <= 10 && phase !== "done" ? "bad" : "warn"} />
+          <StatTile icon={<Target size={18} />} label="Round" value={phase === "market" ? `${round}/3` : phase === "guess" ? "Guess" : "Scored"} />
+        </div>
+
+        {phase === "market" ? (
+          <>
+            <div className="problem-card inference-copy">
+              <span>Round {round} of 3</span>
+              <h3>Make both markets</h3>
+              <p>Quote a bid and ask for the sum and product of the hidden values. The counterparty will buy, hold, or sell based on the true value.</p>
+            </div>
+
+            <div className="market-form-grid">
+              <label>
+                <span>Sum bid</span>
+                <input type="number" value={market.sumBid} onChange={(event) => updateMarket("sumBid", Number(event.currentTarget.value))} />
+              </label>
+              <label>
+                <span>Sum ask</span>
+                <input type="number" value={market.sumAsk} onChange={(event) => updateMarket("sumAsk", Number(event.currentTarget.value))} />
+              </label>
+              <label>
+                <span>Product bid</span>
+                <input type="number" value={market.productBid} onChange={(event) => updateMarket("productBid", Number(event.currentTarget.value))} />
+              </label>
+              <label>
+                <span>Product ask</span>
+                <input type="number" value={market.productAsk} onChange={(event) => updateMarket("productAsk", Number(event.currentTarget.value))} />
+              </label>
+            </div>
+
+            <button className="primary-action" onClick={() => submitMarket(false)}>
+              <Play size={18} />
+              Submit market
+            </button>
+          </>
+        ) : null}
+
+        {phase === "guess" ? (
+          <>
+            <div className="problem-card inference-copy">
+              <span>Final window</span>
+              <h3>Guess the three values</h3>
+              <p>Use the three market responses to get as close as possible. Order does not matter.</p>
+            </div>
+
+            <div className="guess-grid">
+              <label>
+                <span>Value 1</span>
+                <input type="number" value={guess.a} onChange={(event) => updateGuess("a", Number(event.currentTarget.value))} />
+              </label>
+              <label>
+                <span>Value 2</span>
+                <input type="number" value={guess.b} onChange={(event) => updateGuess("b", Number(event.currentTarget.value))} />
+              </label>
+              <label>
+                <span>Value 3</span>
+                <input type="number" value={guess.c} onChange={(event) => updateGuess("c", Number(event.currentTarget.value))} />
+              </label>
+            </div>
+
+            <button className="primary-action" onClick={() => submitGuess(false)}>
+              <Check size={18} />
+              Lock guess
+            </button>
+          </>
+        ) : null}
+
+        {phase === "done" ? (
+          <div className="result-panel">
+            <div>
+              <span>Hidden values</span>
+              <strong>{sortedHidden.map(formatInteger).join(", ")}</strong>
+            </div>
+            <div>
+              <span>Your guess</span>
+              <strong>{sortedGuess.map(formatInteger).join(", ")}</strong>
+            </div>
+            <div>
+              <span>Value error</span>
+              <strong>{formatInteger(valueError)}</strong>
+            </div>
+            <div>
+              <span>Sum / product error</span>
+              <strong>
+                {formatInteger(Math.abs(trueSum - guessedSum))} / {formatInteger(Math.abs(trueProduct - guessedProduct))}
+              </strong>
+            </div>
+          </div>
+        ) : null}
+
+        <button className="icon-button label-button inference-reset" onClick={resetGame} title="New hidden values">
+          <RefreshCcw size={16} />
+          New game
+        </button>
+      </section>
+
+      <section className="training-panel inference-history" aria-labelledby="inference-history-heading">
+        <div className="panel-heading">
+          <div>
+            <span className="section-kicker">Information tape</span>
+            <h2 id="inference-history-heading">Market responses</h2>
+          </div>
+          <span className="deck-count">{rounds.length}/3</span>
+        </div>
+
+        <div className="coach-list">
+          {rounds.length ? (
+            rounds.map((entry) => (
+              <div className="round-card" key={entry.round}>
+                <span>Round {entry.round}{entry.expired ? " - expired" : ""}</span>
+                <strong>
+                  Sum {formatInteger(entry.sumBid)} / {formatInteger(entry.sumAsk)}
+                </strong>
+                <p className={`response-chip ${entry.sumResponse}`}>{responseMeaning(entry.sumResponse, "sum")}</p>
+                <strong>
+                  Product {formatInteger(entry.productBid)} / {formatInteger(entry.productAsk)}
+                </strong>
+                <p className={`response-chip ${entry.productResponse}`}>{responseMeaning(entry.productResponse, "product")}</p>
+              </div>
+            ))
+          ) : (
+            <div>
+              <span>No responses yet</span>
+              <strong>Make round 1</strong>
+              <p>Wide markets reveal less. Narrow markets reveal more, but they are easier to be wrong about.</p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function BookLadder({ scenario }: { scenario: QuoteScenario }) {
   const book = useMemo(() => createBook(scenario.fair, scenario.bookImbalance, scenario.volatility), [scenario]);
   const imbalance = bookImbalance(book);
@@ -1003,6 +1338,10 @@ function ActivePrepView({
         <PrepProgressBreakdown progress={progress} />
       </div>
     );
+  }
+
+  if (activeTab === "inference") {
+    return <InferenceGame />;
   }
 
   if (activeTab === "concepts") {

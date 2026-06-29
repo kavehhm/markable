@@ -334,7 +334,8 @@ h2 {
 
 .timer-pill,
 .micro-pill,
-.deck-count {
+.deck-count,
+.countdown-pill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -346,6 +347,19 @@ h2 {
   font-size: 0.88rem;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.countdown-pill {
+  min-width: 92px;
+  justify-content: center;
+  background: #e8f3f2;
+  color: var(--teal-dark);
+  font-size: 1rem;
+}
+
+.countdown-pill.danger {
+  background: var(--red-soft);
+  color: var(--red);
 }
 
 .micro-pill.up {
@@ -603,6 +617,121 @@ h2 {
 
 .answer-choice.selected {
   box-shadow: inset 0 0 0 1px currentColor;
+}
+
+.inference-grid {
+  grid-template-columns: minmax(420px, 1.1fr) minmax(340px, 0.8fr);
+}
+
+.game-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.inference-copy {
+  min-height: auto;
+  margin-bottom: 12px;
+}
+
+.market-form-grid,
+.guess-grid {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.market-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.guess-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.market-form-grid label,
+.guess-grid label {
+  display: grid;
+  gap: 6px;
+  min-height: 76px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+
+.market-form-grid span,
+.guess-grid span,
+.result-panel span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.market-form-grid input,
+.guess-grid input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.result-panel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.result-panel div {
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+
+.result-panel strong {
+  display: block;
+  margin-top: 7px;
+  overflow-wrap: anywhere;
+  font-size: 1.08rem;
+}
+
+.inference-reset {
+  margin-top: 12px;
+}
+
+.round-card strong {
+  text-transform: none;
+}
+
+.response-chip {
+  display: block;
+  margin: 8px 0 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.response-chip.buy {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.response-chip.sell {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.response-chip.hold {
+  background: var(--amber-soft);
+  color: var(--amber);
 }
 
 .coach-list,
@@ -931,7 +1060,8 @@ h2 {
 @media (max-width: 1180px) {
   .workspace-grid,
   .quote-grid,
-  .two-column-grid {
+  .two-column-grid,
+  .inference-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -961,7 +1091,8 @@ h2 {
   .summary-band,
   .workspace-grid,
   .quote-grid,
-  .two-column-grid {
+  .two-column-grid,
+  .inference-grid {
     grid-template-columns: 1fr;
     width: 100%;
   }
@@ -969,7 +1100,11 @@ h2 {
   .scenario-grid,
   .book-summary,
   .sim-stats,
-  .given-grid {
+  .given-grid,
+  .game-status-grid,
+  .market-form-grid,
+  .guess-grid,
+  .result-panel {
     grid-template-columns: 1fr;
   }
 
