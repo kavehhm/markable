@@ -12,6 +12,7 @@ import {
   Shuffle,
   Spade,
   Target,
+  Zap,
 } from "lucide-react";
 import {
   CounterpartyType,
@@ -45,6 +46,12 @@ const MODES: Array<{
     title: "Fair Value Drill",
     blurb: "Estimate the fair value, then reveal the exact distribution.",
     Icon: Target,
+  },
+  {
+    id: "fv_sprint",
+    title: "Fair Value Sprint",
+    blurb: "Rapid fire bank of 100 fair value questions to build fast first estimates.",
+    Icon: Zap,
   },
   {
     id: "inference",
@@ -160,6 +167,8 @@ export function ArenaHome({ onStart }: { onStart: (s: ArenaSession) => void }) {
         ? "90% interval"
       : mode === "trader_memory"
         ? "Working memory state"
+      : mode === "fv_sprint"
+        ? "100 question bank"
       : mode === "inference"
         ? selectedInference.title
         : selectedPayoff?.name ?? "Hidden state";
@@ -198,6 +207,8 @@ export function ArenaHome({ onStart }: { onStart: (s: ArenaSession) => void }) {
             ? "one prompt"
           : mode === "trader_memory"
             ? "timed events"
+          : mode === "fv_sprint"
+            ? "pick a topic"
             : difficulty;
 
   function start() {
@@ -323,7 +334,7 @@ export function ArenaHome({ onStart }: { onStart: (s: ArenaSession) => void }) {
               </div>
             ) : null}
 
-            {mode !== "objective" && mode !== "inference" ? (
+            {mode !== "objective" && mode !== "inference" && mode !== "fv_sprint" ? (
               <div className="config-block">
                 <span className="config-legend">Difficulty</span>
                 <div className="seg">

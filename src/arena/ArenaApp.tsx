@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CounterpartyType, Difficulty, SourceKind } from "./engine";
 import { ArenaHome } from "./pages/ArenaHome";
 import { FairValueDrill } from "./pages/FairValueDrill";
+import { FairValueSprint } from "./pages/FairValueSprint";
 import { MakeMarket } from "./pages/MakeMarket";
 import { HiddenInference } from "./pages/HiddenInference";
 import { ObjectiveLab } from "./pages/ObjectiveLab";
@@ -14,6 +15,7 @@ import { TraderMemoryArena } from "./pages/TraderMemoryArena";
 
 export type ArenaMode =
   | "fair_value"
+  | "fv_sprint"
   | "make_market"
   | "inference"
   | "objective"
@@ -58,6 +60,8 @@ export function ArenaApp() {
   switch (session.mode) {
     case "fair_value":
       return <FairValueDrill session={session} onExit={back} />;
+    case "fv_sprint":
+      return <FairValueSprint onExit={back} />;
     case "make_market":
       return <MakeMarket session={session} onExit={back} />;
     case "inference":
