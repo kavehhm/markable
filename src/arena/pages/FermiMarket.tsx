@@ -3,6 +3,7 @@ import { ArrowRight, Lightbulb } from "lucide-react";
 import {
   fermiByDifficulty,
   fermiLogError,
+  fermiMarketAction,
   marketContains,
   marketDecades,
 } from "../engine";
@@ -16,6 +17,20 @@ function compact(n: number): string {
   if (n >= 1_000_000) return `${fmt(n / 1_000_000)}M`;
   if (n >= 1_000) return `${fmt(n / 1_000)}k`;
   return fmt(n);
+}
+
+type FermiPhase = "quote" | "response" | "revealed";
+
+function actionLabel(action: ReturnType<typeof fermiMarketAction>): string {
+  if (action === "buy") return "They buy your ask";
+  if (action === "sell") return "They sell your bid";
+  return "They pass";
+}
+
+function actionHint(action: ReturnType<typeof fermiMarketAction>): string {
+  if (action === "buy") return "Their true value is above your high end. Your market was too low.";
+  if (action === "sell") return "Their true value is below your low end. Your market was too high.";
+  return "Their true value is inside your quoted range.";
 }
 
 export function FermiMarket({
@@ -36,7 +51,7 @@ export function FermiMarket({
   const [estimate, setEstimate] = useState("");
   const [bid, setBid] = useState("");
   const [ask, setAsk] = useState("");
-  const [revealed, setRevealed] = useState(false);
+  const [phase, setPhase] = useState<FermiPhase>("quote");
 
   const estNum = Number(estimate);
   const bidNum = Number(bid);
@@ -48,9 +63,12 @@ export function FermiMarket({
   const logErr = hasEstimate ? fermiLogError(estNum, question.answer) : null;
   const contains = hasMarket ? marketContains(bidNum, askNum, question.answer) : false;
   const decades = hasMarket ? marketDecades(bidNum, askNum) : null;
+  const action = hasMarket ? fermiMarketAction(bidNum, askNum, question.answer) : null;
+  const revealed = phase === "revealed";
+  const locked = phase !== "quote";
 
   function next() {
-    setRevealed(false);
+    setPhase("quote");
     setEstimate("");
     setBid("");
     setAsk("");
@@ -71,13 +89,13 @@ export function FermiMarket({
 
           <label className="big-input">
             <span>Your point estimate</span>
-            <input type="number" inputMode="decimal" value={estimate} placeholder="a number" onChange={(e) => setEstimate(e.target.value)} disabled={revealed} />
+            <input type="number" inputMode="decimal" value={estimate} placeholder="a number" onChange={(e) => setEstimate(e.target.value)} disabled={locked} />
           </label>
 
           <div className="quote-form">
             <label className="bidask bid">
               <span>Bid</span>
-              <input type="number" inputMode="decimal" value={bid} placeholder="low end" onChange={(e) => setBid(e.target.value)} disabled={revealed} />
+              <input type="number" inputMode="decimal" value={bid} placeholder="low end" onChange={(e) => setBid(e.target.value)} disabled={locked} />
             </label>
             <div className="bidask-spread">
               <span>decades</span>
@@ -85,13 +103,17 @@ export function FermiMarket({
             </div>
             <label className="bidask ask">
               <span>Ask</span>
-              <input type="number" inputMode="decimal" value={ask} placeholder="high end" onChange={(e) => setAsk(e.target.value)} disabled={revealed} />
+              <input type="number" inputMode="decimal" value={ask} placeholder="high end" onChange={(e) => setAsk(e.target.value)} disabled={locked} />
             </label>
           </div>
 
-          {!revealed ? (
-            <button className="arena-start" onClick={() => setRevealed(true)} disabled={!hasEstimate}>
-              Reveal the worked answer
+          {phase === "quote" ? (
+            <button className="arena-start" onClick={() => setPhase("response")} disabled={!hasMarket}>
+              Submit range
+            </button>
+          ) : phase === "response" ? (
+            <button className="arena-start" onClick={() => setPhase("revealed")}>
+              Reveal worked answer
             </button>
           ) : (
             <button className="ghost-btn wide" onClick={next}>
@@ -102,10 +124,22 @@ export function FermiMarket({
 
         <Panel>
           <PanelHead kicker="The reasoning" title="Order of magnitude" />
-          {!revealed ? (
+          {phase === "quote" ? (
             <div className="locked-hint">
-              Decompose the quantity into factors you can defend, then commit. The breakdown unlocks on reveal.
+              Quote a bid and ask first. The counterparty will buy your ask, sell your bid, or pass before the answer is revealed.
             </div>
+          ) : phase === "response" && action ? (
+            <>
+              <div className="stat-grid">
+                <Stat label="Their action" value={actionLabel(action)} tone={action === "pass" ? "good" : "warn"} />
+                <Stat label="Your market" value={`${compact(bidNum)} to ${compact(askNum)}`} />
+                <Stat label="Width" value={`${fmt(decades ?? 0, 1)} decades`} tone={(decades ?? 0) <= 1 ? "good" : "warn"} />
+              </div>
+              <div className="market-verdict">
+                <Pill tone={action === "pass" ? "good" : "warn"}>{actionLabel(action)}</Pill>
+                <span>{actionHint(action)} The exact answer and breakdown are still hidden.</span>
+              </div>
+            </>
           ) : (
             <>
               <div className="stat-grid">
