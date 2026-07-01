@@ -31,6 +31,8 @@ export type BankEntry = {
   config?: GameConfig;
   /** estimate only */
   fv?: number;
+  /** estimate only: the fvSprint question id, used to look up its generator. */
+  fvId?: number;
 };
 
 const MARKET_CATEGORY: Record<string, FvCategory> = {
@@ -121,6 +123,7 @@ function estimateEntries(): BankEntry[] {
     source: estimateSource(q.prompt),
     kind: "estimate",
     fv: q.fv,
+    fvId: q.id,
   }));
 }
 

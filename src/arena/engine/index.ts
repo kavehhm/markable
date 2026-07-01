@@ -16,3 +16,4 @@ export * from "./labScenarios";
 export * from "./fermi";
 export * from "./ledger";
 export * from "./tradingGame";
+export * from "./estimateGen";

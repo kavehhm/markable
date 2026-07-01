@@ -10,6 +10,7 @@ import {
   decideCounterpartyAction,
   drawTrueState,
   enumerateStates,
+  estimateModel,
   findPayoff,
   inventoryDelta,
 } from "../engine";
@@ -30,11 +31,14 @@ const COUNTERPARTIES: Array<{ id: CounterpartyType; label: string; blurb: string
   { id: "uninformed", label: "Uninformed", blurb: "Trades off the public fair value. The edge is yours." },
 ];
 
+type PlayMode = "market" | "sprint";
+
 export function MakeMarket({ onExit }: { onExit: () => void }) {
   const [entry, setEntry] = useState<BankEntry | null>(null);
   const [counterparty, setCounterparty] = useState<CounterpartyType>("informed");
   const [length, setLength] = useState<LengthChoice>("10");
   const [target, setTarget] = useState("10");
+  const [playMode, setPlayMode] = useState<PlayMode>("market");
 
   if (!entry) {
     return (
@@ -45,7 +49,15 @@ export function MakeMarket({ onExit }: { onExit: () => void }) {
           controls={
             <div className="config-row">
               <div className="config-block">
-                <span className="config-legend">Counterparty (market questions)</span>
+                <span className="config-legend">On pick</span>
+                <div className="seg">
+                  <button type="button" className={`seg-btn ${playMode === "market" ? "active" : ""}`} onClick={() => setPlayMode("market")} aria-pressed={playMode === "market"}>Make a market</button>
+                  <button type="button" className={`seg-btn ${playMode === "sprint" ? "active" : ""}`} onClick={() => setPlayMode("sprint")} aria-pressed={playMode === "sprint"}>Fair value sprint</button>
+                </div>
+                <p className="prompt-sub">Market makes a two sided market on the question. Sprint rapid fires fair value estimates.</p>
+              </div>
+              <div className="config-block">
+                <span className="config-legend">Counterparty</span>
                 <div className="cp-grid">
                   {COUNTERPARTIES.map(({ id, label, blurb }) => (
                     <button
@@ -85,7 +97,7 @@ export function MakeMarket({ onExit }: { onExit: () => void }) {
                     <input type="number" inputMode="decimal" value={target} onChange={(e) => setTarget(e.target.value)} />
                   </label>
                 ) : null}
-                <p className="prompt-sub">Estimate questions are graded solo. Counterparty and length apply to market questions.</p>
+                <p className="prompt-sub">Every question is tradeable. Counterparty and length apply to the market flow.</p>
               </div>
             </div>
           }
@@ -94,8 +106,21 @@ export function MakeMarket({ onExit }: { onExit: () => void }) {
     );
   }
 
-  if (entry.kind === "estimate") {
+  if (entry.kind === "estimate" && playMode === "sprint") {
     return <EstimatePlay entry={entry} onExit={onExit} onBack={() => setEntry(null)} />;
+  }
+
+  if (entry.kind === "estimate") {
+    return (
+      <SampledMarketPlay
+        entry={entry}
+        counterparty={counterparty}
+        length={length}
+        target={Number(target) || 10}
+        onExit={onExit}
+        onBack={() => setEntry(null)}
+      />
+    );
   }
 
   return (
@@ -127,6 +152,13 @@ type RoundLog = {
 };
 
 type Phase = "quote" | "result" | "summary";
+
+type Benchmark = {
+  quote: { bid: number; ask: number };
+  rationale: string;
+  expectedPnl: number;
+  worstCasePnl: number;
+};
 
 function MarketPlay({
   entry,
@@ -400,7 +432,7 @@ function SummaryBlock({
   stats, benchQuote, endless, total, target, pnls, onAgain, onExit,
 }: {
   stats: ReturnType<typeof sessionStats>;
-  benchQuote: ReturnType<typeof bestQuotesByObjective>["fair"];
+  benchQuote: Benchmark;
   endless: boolean;
   total: number;
   target: number;
@@ -594,6 +626,219 @@ function EstimatePlay({ entry, onExit, onBack }: { entry: BankEntry; onExit: () 
             </div>
           ) : (
             <div className="locked-hint" style={{ marginTop: 12 }}>Commit a number to reveal the fair value. Your running accuracy builds here.</div>
+          )}
+        </Panel>
+      </div>
+    </div>
+  );
+}
+
+// --- sampled market path (fair value questions with real settlement) --------
+
+function fairBenchmark(
+  model: ReturnType<typeof estimateModel>,
+  counterparty: CounterpartyType,
+): Benchmark {
+  const h = Math.max(1, Math.round(0.3 * model.std));
+  const quote = { bid: Math.round(model.fair - h), ask: Math.round(model.fair + h) };
+  let tot = 0;
+  let worst = Infinity;
+  const N = 3000;
+  for (let i = 0; i < N; i++) {
+    const y = model.sample();
+    const action = decideCounterpartyAction(quote, {
+      type: counterparty,
+      fairValue: model.fair,
+      truePayoff: y,
+      noise: counterparty === "noisy" ? 0.18 : undefined,
+      noiseDraw: Math.random(),
+    });
+    const p = computeUserPnl(action, quote, y);
+    tot += p;
+    if (p < worst) worst = p;
+  }
+  return {
+    quote,
+    rationale: `Quote around the fair value ${fmt(model.fair)} with about a ${h * 2} wide spread. Against ${counterparty} flow this stays near break even.`,
+    expectedPnl: tot / N,
+    worstCasePnl: worst === Infinity ? 0 : worst,
+  };
+}
+
+function SampledMarketPlay({
+  entry, counterparty, length, target, onExit, onBack,
+}: {
+  entry: BankEntry;
+  counterparty: CounterpartyType;
+  length: LengthChoice;
+  target: number;
+  onExit: () => void;
+  onBack: () => void;
+}) {
+  const model = useMemo(() => estimateModel(entry.fvId!, entry.fv!), [entry.fvId, entry.fv]);
+  const benchmark = useMemo(() => fairBenchmark(model, counterparty), [model, counterparty]);
+  const sampled = model.std > 0;
+
+  const endless = length === "endless";
+  const totalRounds = endless ? Infinity : Number(length);
+  const bust = -2 * target;
+
+  const [roundId, setRoundId] = useState(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const truePayoff = useMemo(() => model.sample(), [model, roundId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const noiseDraw = useMemo(() => Math.random(), [roundId]);
+
+  const [bid, setBid] = useState("");
+  const [ask, setAsk] = useState("");
+  const [phase, setPhase] = useState<Phase>("quote");
+  const [logs, setLogs] = useState<RoundLog[]>([]);
+  const [inventory, setInventory] = useState(0);
+  const [current, setCurrent] = useState<RoundLog | null>(null);
+
+  const roundPnls = logs.map((l) => l.pnl);
+  const totalPnl = roundPnls.reduce((a, b) => a + b, 0);
+  const roundsPlayed = logs.length;
+
+  const bidNum = Number(bid);
+  const askNum = Number(ask);
+  const validQuote =
+    bid.trim() !== "" && ask.trim() !== "" &&
+    Number.isFinite(bidNum) && Number.isFinite(askNum) && bidNum <= askNum;
+  const crossed = bid.trim() !== "" && ask.trim() !== "" && bidNum > askNum;
+  const sessionOver = endless ? totalPnl >= target || totalPnl <= bust : roundsPlayed >= totalRounds;
+  const stats = sessionStats(roundPnls);
+
+  function submit() {
+    if (!validQuote) return;
+    const quote = { bid: bidNum, ask: askNum };
+    const action = decideCounterpartyAction(quote, {
+      type: counterparty,
+      fairValue: model.fair,
+      truePayoff,
+      noise: counterparty === "noisy" ? 0.18 : undefined,
+      noiseDraw,
+    });
+    const pnl = computeUserPnl(action, quote, truePayoff);
+    const log: RoundLog = { round: roundsPlayed + 1, quote, action, truePayoff, pnl };
+    setLogs((l) => [...l, log]);
+    setCurrent(log);
+    setInventory((inv) => inv + inventoryDelta(action));
+    setBid("");
+    setAsk("");
+    setPhase("result");
+  }
+
+  function next() {
+    setRoundId((r) => r + 1);
+    setPhase("quote");
+  }
+
+  function reset() {
+    setLogs([]);
+    setInventory(0);
+    setCurrent(null);
+    setRoundId((r) => r + 1);
+    setPhase("quote");
+  }
+
+  return (
+    <div className="arena-shell">
+      <Topline
+        title="Make a Market"
+        onExit={onExit}
+        right={
+          <span className="topline-tags">
+            <button className="ghost-btn compact" onClick={onBack}><RefreshCcw size={14} /> Change question</button>
+            <span className="cp-chip muted">vs {counterparty}</span>
+          </span>
+        }
+      />
+
+      <div className="session-bar">
+        <Stat label="Round" value={endless ? `${roundsPlayed}` : `${Math.min(roundsPlayed + (phase === "quote" ? 1 : 0), totalRounds)} / ${totalRounds}`} />
+        <Stat label="Total PnL" value={fmtSigned(totalPnl)} tone={totalPnl >= 0 ? "good" : "bad"} hint={endless ? `target ${fmt(target)}` : undefined} />
+        <Stat label="Worst round" value={roundsPlayed ? fmt(stats.worst) : "."} tone={stats.worst >= 0 ? "good" : "bad"} />
+        <Stat label="Inventory" value={String(inventory)} tone={Math.abs(inventory) >= 3 ? "warn" : "neutral"} hint={inventory > 0 ? "long" : inventory < 0 ? "short" : "flat"} />
+      </div>
+
+      <div className="play-grid">
+        <Panel className="prompt-panel">
+          <PanelHead kicker="Quote a two sided market" title={entry.name} />
+          <span className="setup-chip">{entry.category} · {entry.difficulty}{sampled ? "" : " · settles at fair value"}</span>
+          <p className="prompt-text">{entry.prompt}</p>
+          <p className="prompt-sub">
+            {sampled
+              ? `A fresh outcome is drawn each round. Your ${counterparty} counterparty trades only when your price helps them.`
+              : `This is an expectation, so it settles at its fair value. Bracket it or the informed desk picks you off.`}
+          </p>
+
+          {phase !== "summary" ? (
+            <>
+              <div className="quote-form">
+                <label className="bidask bid">
+                  <span>Bid</span>
+                  <input type="number" inputMode="decimal" value={bid} placeholder="you buy at" onChange={(e) => setBid(e.target.value)} disabled={phase === "result"} />
+                </label>
+                <div className="bidask-spread">
+                  <span>width</span>
+                  <strong>{validQuote ? fmt(askNum - bidNum) : "."}</strong>
+                </div>
+                <label className="bidask ask">
+                  <span>Ask</span>
+                  <input type="number" inputMode="decimal" value={ask} placeholder="you sell at" onChange={(e) => setAsk(e.target.value)} disabled={phase === "result"} />
+                </label>
+              </div>
+              {crossed ? <p className="quote-error">Bid must be at or below ask.</p> : null}
+
+              {phase === "quote" ? (
+                <button className="arena-start" onClick={submit} disabled={!validQuote}>Submit quote</button>
+              ) : null}
+
+              {phase === "result" && current ? (
+                <ResultBlock
+                  log={current}
+                  counterparty={counterparty}
+                  fairValue={model.fair}
+                  sessionOver={sessionOver}
+                  onNext={next}
+                  onFinish={() => setPhase("summary")}
+                />
+              ) : null}
+            </>
+          ) : (
+            <SummaryBlock stats={stats} benchQuote={benchmark} endless={endless} total={totalPnl} target={target} pnls={roundPnls} onAgain={reset} onExit={onBack} />
+          )}
+        </Panel>
+
+        <Panel>
+          <PanelHead
+            kicker="Coaching for this question"
+            title="Fair value benchmark"
+            right={<Pill tone="accent">{fmt(benchmark.quote.bid)} / {fmt(benchmark.quote.ask)}</Pill>}
+          />
+          <p className="implication">{benchmark.rationale}</p>
+          <div className="stat-grid two" style={{ marginTop: 12 }}>
+            <Stat label="Fair value" value={fmt(model.fair)} tone="accent" />
+            <Stat label="Spread (std)" value={sampled ? fmt(model.std) : "0"} tone="warn" />
+          </div>
+
+          {logs.length ? (
+            <div className="history">
+              <span className="pnl-rail-title">Round history</span>
+              {logs.slice().reverse().map((l) => (
+                <div key={l.round} className="history-row">
+                  <span>#{l.round}</span>
+                  <Pill tone={ACTION_COPY[l.action].tone}>
+                    {l.action === "buy_from_user" ? "sold" : l.action === "sell_to_user" ? "bought" : "pass"}
+                  </Pill>
+                  <span className="history-quote">{fmt(l.quote.bid)}/{fmt(l.quote.ask)}</span>
+                  <strong className={l.pnl >= 0 ? "pos" : "neg"}>{fmtSigned(l.pnl)}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="locked-hint" style={{ marginTop: 12 }}>Quote a few rounds. Your history builds up here.</div>
           )}
         </Panel>
       </div>
