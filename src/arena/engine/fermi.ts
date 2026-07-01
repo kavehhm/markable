@@ -342,6 +342,198 @@ export const FERMI_QUESTIONS: FermiQuestion[] = [
       "Multiplying gives about 2 billion passenger miles per day.",
     ],
   },
+  {
+    id: "tanzania_population",
+    prompt: "What is the population of Tanzania, in people?",
+    unit: "people",
+    answer: 68600000,
+    difficulty: "medium",
+    steps: [
+      "Tanzania is a large East African country, bigger than most of its neighbours.",
+      "Kenya is about 55 million; Tanzania is a bit larger in land and population.",
+      "A defensible anchor is high 60s of millions.",
+      "Lands near 68 to 69 million people.",
+    ],
+  },
+  {
+    id: "france_population",
+    prompt: "What is the population of France, in people?",
+    unit: "people",
+    answer: 66000000,
+    difficulty: "easy",
+    steps: [
+      "France is a large Western European country.",
+      "Germany is about 83 million; France is a bit smaller.",
+      "Lands near 66 to 68 million people.",
+    ],
+  },
+  {
+    id: "mcdonalds_worldwide",
+    prompt: "How many McDonald's restaurants operate worldwide?",
+    unit: "restaurants",
+    answer: 40000,
+    difficulty: "medium",
+    steps: [
+      "The US alone has roughly 13,000 to 14,000 locations.",
+      "International markets together hold more than the US.",
+      "Add them up to land near 40,000 restaurants.",
+    ],
+  },
+  {
+    id: "heartbeats_lifetime",
+    prompt: "How many times does a human heart beat in an average lifetime?",
+    unit: "beats",
+    answer: 2500000000,
+    difficulty: "medium",
+    steps: [
+      "Resting heart rate is about 70 beats per minute.",
+      "That is roughly 100,000 beats per day, about 37 million per year.",
+      "Over about 70 years that is near 2.5 billion beats.",
+    ],
+  },
+  {
+    id: "novel_words",
+    prompt: "How many words are in a typical novel?",
+    unit: "words",
+    answer: 90000,
+    difficulty: "easy",
+    steps: [
+      "A novel runs around 300 pages.",
+      "A page holds about 300 words.",
+      "300 times 300 is about 90,000 words.",
+    ],
+  },
+  {
+    id: "breaths_per_day",
+    prompt: "How many breaths does a person take in a day?",
+    unit: "breaths",
+    answer: 20000,
+    difficulty: "easy",
+    steps: [
+      "At rest a person breathes about 14 times a minute.",
+      "That is roughly 840 per hour, about 20,000 per day.",
+    ],
+  },
+  {
+    id: "world_languages",
+    prompt: "How many living languages are spoken in the world?",
+    unit: "languages",
+    answer: 7000,
+    difficulty: "easy",
+    steps: [
+      "Languages cluster by region and ethnic group.",
+      "Counts from linguists land in the several thousands.",
+      "A standard figure is about 7,000 living languages.",
+    ],
+  },
+  {
+    id: "us_households",
+    prompt: "How many households are there in the United States?",
+    unit: "households",
+    answer: 130000000,
+    difficulty: "easy",
+    steps: [
+      "The US has about 330 million people.",
+      "Average household size is roughly 2.5 people.",
+      "330 million divided by 2.5 is about 130 million households.",
+    ],
+  },
+  {
+    id: "seconds_alive_25",
+    prompt: "How many seconds has a 25 year old been alive?",
+    unit: "seconds",
+    answer: 790000000,
+    difficulty: "easy",
+    steps: [
+      "A year is about 31.5 million seconds.",
+      "Multiply by 25 years.",
+      "Lands near 790 million seconds.",
+    ],
+  },
+  {
+    id: "us_libraries",
+    prompt: "How many public library branches are there in the United States?",
+    unit: "branches",
+    answer: 17000,
+    difficulty: "medium",
+    steps: [
+      "Most towns have at least one branch.",
+      "There are tens of thousands of towns and city districts.",
+      "Counts land near 17,000 public library branches.",
+    ],
+  },
+  {
+    id: "starbucks_worldwide",
+    prompt: "How many Starbucks stores operate worldwide?",
+    unit: "stores",
+    answer: 38000,
+    difficulty: "medium",
+    steps: [
+      "The US holds roughly 16,000 stores.",
+      "China and the rest of the world add a similar amount again.",
+      "Lands near 38,000 stores.",
+    ],
+  },
+  {
+    id: "world_airports",
+    prompt: "How many airports are there in the world?",
+    unit: "airports",
+    answer: 40000,
+    difficulty: "medium",
+    steps: [
+      "The US alone has around 5,000 public airports plus many private strips.",
+      "Counting all sizes worldwide multiplies that several times.",
+      "Lands near 40,000 airports of all sizes.",
+    ],
+  },
+  {
+    id: "boeing_747_weight",
+    prompt: "What is the maximum takeoff weight of a Boeing 747, in kilograms?",
+    unit: "kilograms",
+    answer: 400000,
+    difficulty: "hard",
+    steps: [
+      "A 747 carries about 400 people plus cargo and a lot of fuel.",
+      "Fuel alone is on the order of 180,000 kg.",
+      "Structure, payload, and fuel sum to about 400,000 kg.",
+    ],
+  },
+  {
+    id: "trees_on_earth",
+    prompt: "How many trees are there on Earth?",
+    unit: "trees",
+    answer: 3000000000000,
+    difficulty: "hard",
+    steps: [
+      "Forests cover a large share of the land surface.",
+      "Tree density and forest area estimates combine to trillions.",
+      "The accepted figure is about 3 trillion trees.",
+    ],
+  },
+  {
+    id: "cars_in_world",
+    prompt: "How many cars are there in the world?",
+    unit: "cars",
+    answer: 1400000000,
+    difficulty: "hard",
+    steps: [
+      "Rich countries have close to one car per two people.",
+      "Weighting the global population by ownership rates,",
+      "the total lands near 1.4 billion cars.",
+    ],
+  },
+  {
+    id: "human_body_cells",
+    prompt: "How many cells are in the human body?",
+    unit: "cells",
+    answer: 37000000000000,
+    difficulty: "hard",
+    steps: [
+      "Cells are microscopic and pack a body densely.",
+      "Biologists estimate tens of trillions.",
+      "A standard figure is about 37 trillion cells.",
+    ],
+  },
 ];
 
 export function fermiByDifficulty(
@@ -382,4 +574,30 @@ export function fermiMarketAction(
 export function marketDecades(bid: number, ask: number): number {
   if (bid <= 0 || ask <= 0) return Infinity;
   return Math.log10(ask) - Math.log10(bid);
+}
+
+/**
+ * Apply an informed counterparty's response to your quote, returning the trade
+ * price and the signed change to your position and cash. Selling adds cash and
+ * shorts you; buying spends cash and lengthens you. A pass leaves you flat.
+ */
+export function fermiTrade(
+  action: FermiMarketAction,
+  bid: number,
+  ask: number,
+): { price: number | null; positionDelta: number; cashDelta: number } {
+  if (action === "buy") {
+    // They lift your ask, so you sell one contract at the ask.
+    return { price: ask, positionDelta: -1, cashDelta: ask };
+  }
+  if (action === "sell") {
+    // They hit your bid, so you buy one contract at the bid.
+    return { price: bid, positionDelta: 1, cashDelta: -bid };
+  }
+  return { price: null, positionDelta: 0, cashDelta: 0 };
+}
+
+/** PnL of a position and cash ledger settled at the true answer. */
+export function fermiSettlementPnl(position: number, cash: number, answer: number): number {
+  return cash + position * answer;
 }

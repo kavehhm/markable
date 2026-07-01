@@ -1,4 +1,25 @@
 import type { ReactNode } from "react";
+import { ArrowLeft } from "lucide-react";
+
+export function Topline({
+  title,
+  onExit,
+  right,
+}: {
+  title: string;
+  onExit: () => void;
+  right?: ReactNode;
+}) {
+  return (
+    <div className="arena-topline">
+      <button className="ghost-btn" onClick={onExit}>
+        <ArrowLeft size={16} /> Lobby
+      </button>
+      <span className="arena-mode-tag">{title}</span>
+      {right}
+    </div>
+  );
+}
 
 export function Panel({
   children,

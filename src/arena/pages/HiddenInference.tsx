@@ -15,9 +15,8 @@ import {
 } from "../engine";
 import { ArenaSession } from "../ArenaApp";
 import { OutcomeView } from "../components/OutcomeView";
-import { Panel, PanelHead, Pill, Stat } from "../components/ui";
+import { Panel, PanelHead, Pill, Stat, Topline } from "../components/ui";
 import { fmt, fmtSigned, pct } from "../format";
-import { Topline } from "./FairValueDrill";
 
 type RoundLog = {
   round: number;
@@ -27,13 +26,17 @@ type RoundLog = {
   remaining: number;
 };
 
-export function HiddenInference({
-  session,
-  onExit,
-}: {
-  session: ArenaSession;
-  onExit: () => void;
-}) {
+/** Distinct surviving payoff values with their posterior probability. */
+function candidatesFor(belief: GameState[], payoff: ReturnType<typeof findPayoff>) {
+  const map = new Map<number, number>();
+  for (const s of belief) {
+    const y = payoff!.evaluate(s);
+    map.set(y, (map.get(y) ?? 0) + s.probability);
+  }
+  return [...map.entries()].map(([value, p]) => ({ value, p })).sort((a, b) => a.value - b.value);
+}
+
+export function HiddenInference({ session, onExit }: { session: ArenaSession; onExit: () => void }) {
   const scenario = useMemo(
     () => findInferenceScenario(session.inferenceId ?? session.payoffId),
     [session.inferenceId, session.payoffId],
@@ -61,8 +64,11 @@ export function HiddenInference({
   const [bid, setBid] = useState("");
   const [ask, setAsk] = useState("");
   const [guess, setGuess] = useState("");
+  const [choice, setChoice] = useState<number | null>(null);
 
   const summary = useMemo(() => summariseBelief(belief, payoff), [belief, payoff]);
+  const candidates = useMemo(() => candidatesFor(belief, payoff), [belief, payoff]);
+  const useChoices = candidates.length >= 2 && candidates.length <= 10;
 
   const bidNum = Number(bid);
   const askNum = Number(ask);
@@ -83,10 +89,7 @@ export function HiddenInference({
 
     setBelief(survivors);
     setPnl((p) => p + roundPnl);
-    setLogs((l) => [
-      ...l,
-      { round, quote, action, pnl: roundPnl, remaining: survivors.length },
-    ]);
+    setLogs((l) => [...l, { round, quote, action, pnl: roundPnl, remaining: survivors.length }]);
     setBid("");
     setAsk("");
     if (round >= ROUNDS) setPhase("guess");
@@ -107,10 +110,13 @@ export function HiddenInference({
     setBid("");
     setAsk("");
     setGuess("");
+    setChoice(null);
   }
 
-  const guessNum = Number(guess);
-  const guessError = guess.trim() !== "" ? Math.abs(guessNum - truePayoff) : null;
+  const guessValue = useChoices ? choice : (guess.trim() !== "" ? Number(guess) : null);
+  const hasGuess = guessValue !== null && Number.isFinite(guessValue);
+  const guessError = hasGuess ? Math.abs((guessValue as number) - truePayoff) : null;
+  const correct = hasGuess && Math.abs((guessValue as number) - truePayoff) < 1e-9;
   const inPosterior = truePayoff >= summary.min && truePayoff <= summary.max;
 
   return (
@@ -140,7 +146,7 @@ export function HiddenInference({
           <p className="prompt-text">{scenario.prompt}</p>
           <p className="prompt-sub">
             You get {ROUNDS} quotes. Each toxic trade or pass is a constraint on the hidden payoff.
-            After the last quote, lock your numeric estimate.
+            After the last quote, name the hidden value.
           </p>
 
           {phase === "quote" ? (
@@ -167,14 +173,32 @@ export function HiddenInference({
 
           {phase === "guess" ? (
             <>
-              <label className="big-input">
-                <span>Your guess for the {payoff.name.toLowerCase()}</span>
-                <input type="number" inputMode="decimal" value={guess} placeholder="a number" onChange={(e) => setGuess(e.target.value)} />
-              </label>
+              {useChoices ? (
+                <div className="guess-choices">
+                  <span className="config-legend">Pick the hidden {payoff.name.toLowerCase()}</span>
+                  <div className="guess-grid">
+                    {candidates.map((c) => (
+                      <button
+                        type="button"
+                        key={c.value}
+                        className={`guess-chip ${choice === c.value ? "active" : ""}`}
+                        onClick={() => setChoice(c.value)}
+                        aria-pressed={choice === c.value}
+                      >
+                        <strong>{fmt(c.value)}</strong>
+                        <span>{pct(c.p, 0)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <label className="big-input">
+                  <span>Your guess for the {payoff.name.toLowerCase()}</span>
+                  <input type="number" inputMode="decimal" value={guess} placeholder="a number" onChange={(e) => setGuess(e.target.value)} />
+                </label>
+              )}
               <p className="prompt-sub">Posterior says it sits between {fmt(summary.min)} and {fmt(summary.max)}.</p>
-              <button className="arena-start" onClick={submitGuess} disabled={guess.trim() === ""}>
-                Lock guess
-              </button>
+              <button className="arena-start" onClick={submitGuess} disabled={!hasGuess}>Lock guess</button>
             </>
           ) : null}
 
@@ -187,9 +211,16 @@ export function HiddenInference({
                   <strong>{fmt(truePayoff)}</strong>
                 </div>
               </div>
+              <div className="market-verdict">
+                <Pill tone={correct ? "good" : guessError !== null && guessError <= 1 ? "warn" : "bad"}>
+                  {correct ? "exact" : guessError !== null && guessError <= 1 ? "within 1" : "missed"}
+                </Pill>
+                <span>You named {hasGuess ? fmt(guessValue as number) : "."}; the true value was {fmt(truePayoff)}.</span>
+              </div>
               <div className="stat-grid">
                 <Stat label="Final PnL" value={fmtSigned(pnl)} tone={pnl >= 0 ? "good" : "bad"} />
-                <Stat label="Guess error" value={guessError === null ? "." : fmt(guessError)} tone={guessError !== null && guessError <= 1 ? "good" : "warn"} />
+                <Stat label="Guess error" value={guessError === null ? "." : fmt(guessError)} tone={correct ? "good" : "warn"} />
+                <Stat label="Narrowed to" value={`${summary.count} of ${total}`} tone="accent" />
                 <Stat label="In posterior" value={inPosterior ? "yes" : "no"} tone={inPosterior ? "good" : "bad"} />
               </div>
               <button className="ghost-btn wide" onClick={newGame}>

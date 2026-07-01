@@ -3,7 +3,7 @@ import { RefreshCcw } from "lucide-react";
 import { ArenaSession } from "../ArenaApp";
 import { Panel, PanelHead, Pill, Stat } from "../components/ui";
 import { fmt, fmtSigned } from "../format";
-import { Topline } from "./FairValueDrill";
+import { Topline } from "../components/ui";
 
 type TradeSide = "interviewer_buys" | "interviewer_sells" | "pass";
 

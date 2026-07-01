@@ -162,6 +162,32 @@ export const INFERENCE_SCENARIOS: InferenceScenario[] = [
     resetLabel: "New hidden cards",
   },
   {
+    id: "dice_sum_hidden",
+    title: "Hidden Dice Sum",
+    source: "dice",
+    difficulty: "easy",
+    payoffId: "dice_sum",
+    config: { source: "dice", count: 3, diceFaces: 6 },
+    rounds: 3,
+    setup: "3 hidden six sided dice",
+    prompt:
+      "An informed desk knows the three dice. Quote the sum, read each trade or pass, then name the hidden total.",
+    resetLabel: "New hidden dice",
+  },
+  {
+    id: "coin_heads_hidden",
+    title: "Hidden Heads Count",
+    source: "coins",
+    difficulty: "medium",
+    payoffId: "coin_heads",
+    config: { source: "coins", count: 6 },
+    rounds: 3,
+    setup: "6 hidden coin flips",
+    prompt:
+      "The desk knows the flips. Quote the number of heads, narrow it with each trade, then pick the hidden count.",
+    resetLabel: "New hidden flips",
+  },
+  {
     id: "number_line",
     title: "Number-Line Market",
     source: "latent",
@@ -171,7 +197,7 @@ export const INFERENCE_SCENARIOS: InferenceScenario[] = [
     rounds: 4,
     setup: "one hidden integer from -10 to 10",
     prompt:
-      "A fair value is picked from a number line with more mass near zero. Use your quotes like interval cuts.",
+      "A fair value is picked from a number line with more mass near zero. Use your quotes like interval cuts, then pick the hidden number.",
     resetLabel: "New hidden number",
   },
   {

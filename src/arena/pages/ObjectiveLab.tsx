@@ -12,7 +12,7 @@ import {
 import { ArenaSession } from "../ArenaApp";
 import { Panel, PanelHead, Pill, Stat } from "../components/ui";
 import { fmt, fmtSigned } from "../format";
-import { Topline } from "./FairValueDrill";
+import { Topline } from "../components/ui";
 
 const OBJECTIVES: Array<{ id: LabObjective; label: string; blurb: string }> = [
   { id: "max_ev", label: "Max EV", blurb: "Chase the highest expected profit, risk allowed." },
