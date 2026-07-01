@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CounterpartyType, Difficulty, SourceKind } from "./engine";
 import { ArenaHome } from "./pages/ArenaHome";
 import { MakeMarket } from "./pages/MakeMarket";
+import { FairValue } from "./pages/FairValue";
 import { HiddenInference } from "./pages/HiddenInference";
 import { ObjectiveLab } from "./pages/ObjectiveLab";
 import { FermiMarket } from "./pages/FermiMarket";
@@ -13,6 +14,7 @@ import { TradingFloor } from "./pages/TradingFloor";
 
 export type ArenaMode =
   | "make_market"
+  | "fair_value"
   | "trade_floor"
   | "inference"
   | "objective"
@@ -43,6 +45,8 @@ export function ArenaApp() {
   switch (session.mode) {
     case "make_market":
       return <MakeMarket onExit={back} />;
+    case "fair_value":
+      return <FairValue onExit={back} />;
     case "trade_floor":
       return <TradingFloor onExit={back} />;
     case "inference":

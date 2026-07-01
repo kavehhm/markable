@@ -8,6 +8,7 @@ import {
   runLedger,
 } from "../engine";
 import { Panel, PanelHead, Pill, Stat, Topline } from "../components/ui";
+import { GameRules } from "../components/gameRules";
 import { fmt, fmtSigned } from "../format";
 
 type Phase = "setup" | "watch" | "gap" | "quiz" | "review";
@@ -158,7 +159,7 @@ export function TraderMemoryArena({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="arena-shell">
-      <Topline title="Trader Memory Arena" onExit={onExit} right={<span className="cp-chip">mental ledger drill</span>} />
+      <Topline title="Trader Memory Arena" onExit={onExit} rules={<GameRules game="trader_memory" />} right={<span className="cp-chip">mental ledger drill</span>} />
 
       {phase === "setup" ? (
         <div className="memory-layout">

@@ -30,7 +30,7 @@ function numberLineConfig(): GameConfig {
   return {
     source: "latent",
     count: 21,
-    latentLabel: "one hidden integer from -10 to 10 with a center-heavy prior",
+    latentLabel: "one hidden integer from -10 to 10 with a centre heavy prior",
     latentStates: Array.from({ length: 21 }, (_, i) => {
       const value = i - 10;
       return {
@@ -46,7 +46,7 @@ function numberLineConfig(): GameConfig {
 const HIT_RATE_CONFIG: GameConfig = {
   source: "latent",
   count: 7,
-  latentLabel: "one hidden hit rate for a ten-trial process",
+  latentLabel: "one hidden hit rate for a ten trial process",
   latentStates: weightedStates("hit", [
     { label: "cold process, p = 20%", value: 2, weight: 1, extra: { hitRate: 0.2 } },
     { label: "weak process, p = 30%", value: 3, weight: 3, extra: { hitRate: 0.3 } },
@@ -61,7 +61,7 @@ const HIT_RATE_CONFIG: GameConfig = {
 const NEWS_JUMP_CONFIG: GameConfig = {
   source: "latent",
   count: 9,
-  latentLabel: "one hidden post-news jump around an anchor price of 100",
+  latentLabel: "one hidden post news jump around an anchor price of 100",
   latentStates: weightedStates("news", [
     { label: "major miss, shock -18", value: 82, weight: 1, extra: { shock: -18 } },
     { label: "clear miss, shock -11", value: 89, weight: 2, extra: { shock: -11 } },
@@ -85,8 +85,8 @@ const TOXIC_FLOW_CONFIG: GameConfig = {
     { label: "retail buyer, mild up markout", value: 3, weight: 7, extra: { regime: "retail buy" } },
     { label: "informed seller, adverse down move", value: -9, weight: 3, extra: { regime: "informed sell" } },
     { label: "informed buyer, adverse up move", value: 9, weight: 3, extra: { regime: "informed buy" } },
-    { label: "stop-run down, extreme toxic print", value: -15, weight: 1, extra: { regime: "stop-run down" } },
-    { label: "stop-run up, extreme toxic print", value: 15, weight: 1, extra: { regime: "stop-run up" } },
+    { label: "stop run down, extreme toxic print", value: -15, weight: 1, extra: { regime: "stop run down" } },
+    { label: "stop run up, extreme toxic print", value: 15, weight: 1, extra: { regime: "stop run up" } },
   ]),
 };
 
@@ -107,7 +107,7 @@ const VOL_REGIME_CONFIG: GameConfig = {
 const PAIR_RESIDUAL_CONFIG: GameConfig = {
   source: "latent",
   count: 9,
-  latentLabel: "one hidden pairs-trading residual after a signal",
+  latentLabel: "one hidden pairs trading residual after a signal",
   latentStates: weightedStates("pair", [
     { label: "correlation break lower, residual -45 bps", value: -45, weight: 1, extra: { regime: "break lower" } },
     { label: "hard mean reversion lower, residual -25 bps", value: -25, weight: 3, extra: { regime: "lower" } },
@@ -137,7 +137,7 @@ export const INFERENCE_SCENARIOS: InferenceScenario[] = [
   },
   {
     id: "cards_product",
-    title: "Fat-Tail Card Product",
+    title: "Fat Tail Card Product",
     source: "cards",
     difficulty: "hard",
     payoffId: "card_product",
@@ -189,7 +189,7 @@ export const INFERENCE_SCENARIOS: InferenceScenario[] = [
   },
   {
     id: "number_line",
-    title: "Number-Line Market",
+    title: "Number Line Market",
     source: "latent",
     difficulty: "easy",
     payoffId: "latent_number_line",
@@ -262,7 +262,7 @@ export const INFERENCE_SCENARIOS: InferenceScenario[] = [
     rounds: 5,
     setup: "one hidden residual after a pairs signal, in basis points",
     prompt:
-      "Most pair residuals stay near flat, but correlation breaks are interview-grade tail risk.",
+      "Most pair residuals stay near flat, but correlation breaks are interview grade tail risk.",
     resetLabel: "New hidden residual",
   },
 ];

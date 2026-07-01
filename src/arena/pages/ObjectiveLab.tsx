@@ -13,6 +13,7 @@ import { ArenaSession } from "../ArenaApp";
 import { Panel, PanelHead, Pill, Stat } from "../components/ui";
 import { fmt, fmtSigned } from "../format";
 import { Topline } from "../components/ui";
+import { GameRules } from "../components/gameRules";
 
 const OBJECTIVES: Array<{ id: LabObjective; label: string; blurb: string }> = [
   { id: "max_ev", label: "Max EV", blurb: "Chase the highest expected profit, risk allowed." },
@@ -66,7 +67,7 @@ export function ObjectiveLab({
 
   return (
     <div className="arena-shell">
-      <Topline title="Objective Lab" onExit={onExit} right={arb ? <Pill tone="good">arbitrage exists</Pill> : <Pill tone="warn">no riskless edge</Pill>} />
+      <Topline title="Objective Lab" onExit={onExit} rules={<GameRules game="objective" />} right={arb ? <Pill tone="good">arbitrage exists</Pill> : <Pill tone="warn">no riskless edge</Pill>} />
 
       <div className="config-block" style={{ marginBottom: 16 }}>
         <span className="config-legend">Optimise for</span>

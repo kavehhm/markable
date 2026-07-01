@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Dices, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import {
@@ -21,17 +21,18 @@ export function MarketBrowse({
   onSelect: (entry: BankEntry) => void;
   controls?: ReactNode;
 }) {
-  const [kind, setKind] = useState<BankFilter["kind"]>("all");
   const [difficulty, setDifficulty] = useState<BankFilter["difficulty"]>("all");
   const [category, setCategory] = useState<BankFilter["category"]>("all");
   const [source, setSource] = useState<BankFilter["source"]>("all");
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [asc, setAsc] = useState(true);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
 
   const filtered = useMemo(
-    () => filterBank({ kind, difficulty, category, source, search }),
-    [kind, difficulty, category, source, search],
+    () => filterBank({ difficulty, category, source, search }),
+    [difficulty, category, source, search],
   );
 
   const rows = useMemo(() => {
@@ -42,6 +43,13 @@ export function MarketBrowse({
       return dir * a.name.localeCompare(b.name);
     });
   }, [filtered, sort, asc]);
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+  const paged = rows.slice(page * pageSize, (page + 1) * pageSize);
+
+  useEffect(() => {
+    setPage(0);
+  }, [difficulty, category, source, search, sort, asc, pageSize]);
 
   function toggleSort(key: SortKey) {
     if (sort === key) setAsc((v) => !v);
@@ -62,43 +70,14 @@ export function MarketBrowse({
 
       <div className="bank-filter">
         <div className="bank-filter-row">
-          <Segmented
-            value={kind ?? "all"}
-            onChange={(v) => setKind(v as BankFilter["kind"])}
-            options={[
-              { value: "all", label: "All types" },
-              { value: "market", label: "Markets" },
-              { value: "estimate", label: "Estimates" },
-            ]}
-          />
-          <Dropdown
-            label="Difficulty"
-            value={difficulty ?? "all"}
-            onChange={(v) => setDifficulty(v as BankFilter["difficulty"])}
-            options={["all", ...BANK_DIFFICULTIES]}
-          />
-          <Dropdown
-            label="Category"
-            value={category ?? "all"}
-            onChange={(v) => setCategory(v as BankFilter["category"])}
-            options={["all", ...BANK_CATEGORIES]}
-          />
-          <Dropdown
-            label="Source"
-            value={source ?? "all"}
-            onChange={(v) => setSource(v as BankFilter["source"])}
-            options={["all", ...BANK_SOURCES]}
-          />
+          <Dropdown label="Difficulty" value={difficulty ?? "all"} onChange={(v) => setDifficulty(v as BankFilter["difficulty"])} options={["all", ...BANK_DIFFICULTIES]} />
+          <Dropdown label="Category" value={category ?? "all"} onChange={(v) => setCategory(v as BankFilter["category"])} options={["all", ...BANK_CATEGORIES]} />
+          <Dropdown label="Source" value={source ?? "all"} onChange={(v) => setSource(v as BankFilter["source"])} options={["all", ...BANK_SOURCES]} />
         </div>
         <div className="bank-search-row">
           <span className="bank-search">
             <Search size={15} />
-            <input
-              type="text"
-              value={search}
-              placeholder="Search questions"
-              onChange={(e) => setSearch(e.target.value)}
-            />
+            <input type="text" value={search} placeholder="Search contracts" onChange={(e) => setSearch(e.target.value)} />
           </span>
           <button type="button" className="bank-dice" onClick={roll} disabled={!filtered.length}>
             <Dices size={15} /> Roll the dice
@@ -110,9 +89,8 @@ export function MarketBrowse({
         <table className="bank-table">
           <thead>
             <tr>
-              <th className="col-type">Type</th>
               <th className="sortable" onClick={() => toggleSort("name")}>
-                Question {sort === "name" ? (asc ? "↑" : "↓") : ""}
+                Contract {sort === "name" ? (asc ? "↑" : "↓") : ""}
               </th>
               <th className="sortable col-cat" onClick={() => toggleSort("category")}>
                 Category {sort === "category" ? (asc ? "↑" : "↓") : ""}
@@ -123,19 +101,17 @@ export function MarketBrowse({
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {paged.length === 0 ? (
               <tr>
-                <td colSpan={4} className="bank-empty">No questions match these filters.</td>
+                <td colSpan={3} className="bank-empty">No contracts match these filters.</td>
               </tr>
             ) : (
-              rows.map((entry) => (
+              paged.map((entry) => (
                 <tr key={entry.id} onClick={() => onSelect(entry)}>
-                  <td className="col-type">
-                    <span className={`bank-kind ${entry.kind}`}>
-                      {entry.kind === "market" ? "Market" : "Estimate"}
-                    </span>
+                  <td className="bank-name">
+                    <span className="bank-name-main">{entry.name}</span>
+                    <span className="bank-sub">{entry.prompt}</span>
                   </td>
-                  <td className="bank-name">{entry.name}</td>
                   <td className="col-cat bank-muted">{entry.category}</td>
                   <td className="col-diff">
                     <span className={`bank-diff ${entry.difficulty}`}>{entry.difficulty}</span>
@@ -146,33 +122,21 @@ export function MarketBrowse({
           </tbody>
         </table>
       </div>
-      <p className="bank-count">{rows.length} questions</p>
-    </div>
-  );
-}
 
-function Segmented({
-  value,
-  onChange,
-  options,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  options: Array<{ value: string; label: string }>;
-}) {
-  return (
-    <div className="seg">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          className={`seg-btn ${value === o.value ? "active" : ""}`}
-          onClick={() => onChange(o.value)}
-          aria-pressed={value === o.value}
-        >
-          {o.label}
-        </button>
-      ))}
+      <div className="bank-pager">
+        <label className="bank-pagesize">
+          Rows
+          <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+            {[25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+        <span className="bank-count">{rows.length} contracts</span>
+        <div className="bank-pager-controls">
+          <button type="button" onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0}>Prev</button>
+          <span>Page {page + 1} of {pageCount}</span>
+          <button type="button" onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))} disabled={page >= pageCount - 1}>Next</button>
+        </div>
+      </div>
     </div>
   );
 }

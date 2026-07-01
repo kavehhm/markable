@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { RefreshCcw, RotateCcw } from "lucide-react";
 import { Panel, PanelHead, Pill, Stat, Topline } from "../components/ui";
+import { GameRules } from "../components/gameRules";
 import { fmt, fmtSigned } from "../format";
 
 type DuelPhase = "your_quote" | "their_quote" | "done";
@@ -150,7 +151,7 @@ export function XyzTightenDuel({ onExit }: { onExit: () => void }) {
   if (sessionDone) {
     return (
       <div className="arena-shell">
-        <Topline title="XYZ Tighten Duel" onExit={onExit} right={<span className="cp-chip">{DUELS} duels</span>} />
+        <Topline title="XYZ Tighten Duel" onExit={onExit} rules={<GameRules game="xyz_tighten" />} right={<span className="cp-chip">{DUELS} duels</span>} />
         <Panel className="prompt-panel">
           <PanelHead kicker="Session review" title="How the duels went" />
           <div className="headline-score">
@@ -177,7 +178,7 @@ export function XyzTightenDuel({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="arena-shell">
-      <Topline title="XYZ Tighten Duel" onExit={onExit} right={<span className="cp-chip">your theo = {yourTheo}</span>} />
+      <Topline title="XYZ Tighten Duel" onExit={onExit} rules={<GameRules game="xyz_tighten" />} right={<span className="cp-chip">your theo = {yourTheo}</span>} />
 
       <div className="session-bar">
         <Stat label="Duel" value={`${duel} / ${DUELS}`} />

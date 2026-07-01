@@ -1,53 +1,26 @@
 import { useMemo, useState } from "react";
 import { RefreshCcw } from "lucide-react";
 import { ArenaSession } from "../ArenaApp";
-import { Panel, PanelHead, Pill, Stat } from "../components/ui";
+import { Panel, PanelHead, Pill, Stat, Topline } from "../components/ui";
+import { GameRules } from "../components/gameRules";
 import { fmt, fmtSigned } from "../format";
-import { Topline } from "../components/ui";
 
 type TradeSide = "interviewer_buys" | "interviewer_sells" | "pass";
+type Phase = "quote" | "quiz" | "review";
 
 type DiceTrade = {
   round: number;
   revealed: number[];
+  theo: number;
   quote: { bid: number; ask: number };
   action: TradeSide;
   price: number | null;
-  positionAfter: number;
-  cashAfter: number;
 };
 
 const DICE_COUNT = 5;
 
 function rollFive(): number[] {
   return Array.from({ length: DICE_COUNT }, () => 1 + Math.floor(Math.random() * 6));
-}
-
-function remainingSumDistribution(count: number): Array<{ value: number; count: number }> {
-  let dist = new Map<number, number>([[0, 1]]);
-  for (let i = 0; i < count; i++) {
-    const next = new Map<number, number>();
-    for (const [sum, ways] of dist) {
-      for (let face = 1; face <= 6; face++) {
-        next.set(sum + face, (next.get(sum + face) ?? 0) + ways);
-      }
-    }
-    dist = next;
-  }
-  return [...dist.entries()]
-    .map(([value, count]) => ({ value, count }))
-    .sort((a, b) => a.value - b.value);
-}
-
-function quantile(dist: Array<{ value: number; count: number }>, q: number): number {
-  const total = dist.reduce((acc, x) => acc + x.count, 0);
-  const target = q * total;
-  let cumulative = 0;
-  for (const x of dist) {
-    cumulative += x.count;
-    if (cumulative >= target) return x.value;
-  }
-  return dist[dist.length - 1]?.value ?? 0;
 }
 
 function actionForQuote(finalSum: number, quote: { bid: number; ask: number }): TradeSide {
@@ -57,58 +30,49 @@ function actionForQuote(finalSum: number, quote: { bid: number; ask: number }): 
 }
 
 function actionCopy(action: TradeSide): { label: string; tone: "good" | "bad" | "warn" } {
-  if (action === "interviewer_buys") return { label: "They buy your ask", tone: "bad" };
-  if (action === "interviewer_sells") return { label: "They sell your bid", tone: "bad" };
+  if (action === "interviewer_buys") return { label: "They bought your ask", tone: "bad" };
+  if (action === "interviewer_sells") return { label: "They sold your bid", tone: "bad" };
   return { label: "No trade", tone: "warn" };
 }
 
-export function FiveDiceMarket({
-  onExit,
-}: {
-  session: ArenaSession;
-  onExit: () => void;
-}) {
+function close(a: number, b: number, tol: number): boolean {
+  return Math.abs(a - b) <= tol;
+}
+
+export function FiveDiceMarket({ onExit }: { session: ArenaSession; onExit: () => void }) {
   const [gameId, setGameId] = useState(0);
   const dice = useMemo(() => rollFive(), [gameId]);
   const finalSum = dice.reduce((acc, d) => acc + d, 0);
 
+  const [phase, setPhase] = useState<Phase>("quote");
   const [revealedCount, setRevealedCount] = useState(1);
   const [bid, setBid] = useState("");
   const [ask, setAsk] = useState("");
   const [position, setPosition] = useState(0);
   const [cash, setCash] = useState(0);
   const [trades, setTrades] = useState<DiceTrade[]>([]);
-  const [settled, setSettled] = useState(false);
+  const [answers, setAnswers] = useState({ pos: "", cash: "", pnl: "" });
 
   const revealed = dice.slice(0, revealedCount);
   const revealedSum = revealed.reduce((acc, d) => acc + d, 0);
   const remaining = DICE_COUNT - revealedCount;
-  const remainingDist = useMemo(() => remainingSumDistribution(remaining), [remaining]);
-  const theoretical = revealedSum + remaining * 3.5;
-  const ciLow = revealedSum + quantile(remainingDist, 0.05);
-  const ciHigh = revealedSum + quantile(remainingDist, 0.95);
-  const lastTrade = [...trades].reverse().find((t) => t.price !== null);
+  const theo = revealedSum + remaining * 3.5;
   const finalPnl = cash + position * finalSum;
-  const publicMarkPnl = cash + position * theoretical;
 
   const bidNum = Number(bid);
   const askNum = Number(ask);
   const validQuote =
-    bid.trim() !== "" &&
-    ask.trim() !== "" &&
-    Number.isFinite(bidNum) &&
-    Number.isFinite(askNum) &&
-    bidNum <= askNum;
+    bid.trim() !== "" && ask.trim() !== "" &&
+    Number.isFinite(bidNum) && Number.isFinite(askNum) && bidNum <= askNum;
   const crossed = bid.trim() !== "" && ask.trim() !== "" && bidNum > askNum;
 
   function submitQuote() {
-    if (!validQuote || settled) return;
+    if (!validQuote || phase !== "quote") return;
     const quote = { bid: bidNum, ask: askNum };
     const action = actionForQuote(finalSum, quote);
     let nextPosition = position;
     let nextCash = cash;
     let price: number | null = null;
-
     if (action === "interviewer_buys") {
       price = quote.ask;
       nextPosition -= 1;
@@ -118,84 +82,61 @@ export function FiveDiceMarket({
       nextPosition += 1;
       nextCash -= quote.bid;
     }
-
-    setTrades((prev) => [
-      ...prev,
-      {
-        round: revealedCount,
-        revealed,
-        quote,
-        action,
-        price,
-        positionAfter: nextPosition,
-        cashAfter: nextCash,
-      },
-    ]);
+    setTrades((prev) => [...prev, { round: revealedCount, revealed, theo, quote, action, price }]);
     setPosition(nextPosition);
     setCash(nextCash);
     setBid("");
     setAsk("");
-
-    if (revealedCount >= DICE_COUNT) {
-      setSettled(true);
-    } else {
-      setRevealedCount((n) => n + 1);
-    }
+    if (revealedCount >= DICE_COUNT) setPhase("quiz");
+    else setRevealedCount((n) => n + 1);
   }
 
   function reset() {
     setGameId((id) => id + 1);
+    setPhase("quote");
     setRevealedCount(1);
     setBid("");
     setAsk("");
     setPosition(0);
     setCash(0);
     setTrades([]);
-    setSettled(false);
+    setAnswers({ pos: "", cash: "", pnl: "" });
   }
 
-  const suggestedSkew = position === 0
-    ? "Flat book: a symmetric market around theoretical value is natural."
-    : position > 0
-      ? "You are long. Shade your market lower to make selling easier and buying less attractive."
-      : "You are short. Shade your market higher to make buying back easier and selling less attractive.";
+  const posOk = answers.pos.trim() !== "" && Number(answers.pos) === position;
+  const cashOk = answers.cash.trim() !== "" && close(Number(answers.cash), cash, 0.5);
+  const pnlOk = answers.pnl.trim() !== "" && close(Number(answers.pnl), finalPnl, 0.5);
+  const canGrade = answers.pos.trim() !== "" && answers.cash.trim() !== "" && answers.pnl.trim() !== "";
 
   return (
     <div className="arena-shell">
-      <Topline title="Five Dice Market" onExit={onExit} right={<span className="cp-chip">sequential interview drill</span>} />
+      <Topline title="Five Dice Market" onExit={onExit} rules={<GameRules game="five_dice" />} right={<span className="cp-chip">sequential drill</span>} />
 
       <div className="session-bar">
-        <Stat label="Reveal" value={settled ? "settled" : `${revealedCount} / ${DICE_COUNT}`} />
-        <Stat label="Position" value={fmtSigned(position)} tone={position === 0 ? "neutral" : "warn"} hint={position > 0 ? "long" : position < 0 ? "short" : "flat"} />
-        <Stat label="Cash" value={fmtSigned(cash)} tone={cash >= 0 ? "good" : "bad"} />
-        <Stat
-          label={settled ? "Final PnL" : "Mark PnL"}
-          value={fmtSigned(settled ? finalPnl : publicMarkPnl)}
-          tone={(settled ? finalPnl : publicMarkPnl) >= 0 ? "good" : "bad"}
-        />
+        <Stat label="Reveal" value={phase === "quote" ? `${revealedCount} / ${DICE_COUNT}` : "settled"} />
+        <Stat label="Position" value={phase === "review" ? fmtSigned(position) : "?"} hint="track it" />
+        <Stat label="Cash" value={phase === "review" ? fmtSigned(cash) : "?"} hint="track it" />
+        <Stat label="Profit" value={phase === "review" ? fmtSigned(finalPnl) : "?"} hint="track it" tone={phase === "review" ? (finalPnl >= 0 ? "good" : "bad") : "neutral"} />
       </div>
 
       <div className="play-grid">
         <Panel className="prompt-panel">
-          <PanelHead kicker="Quote the final five-dice sum" title="A die has just been revealed" />
-          <div className="dice-strip" aria-label="Revealed dice">
-            {dice.map((d, i) => (
-              <span key={i} className={`die ${i < revealedCount ? "" : "hidden"}`}>
-                {i < revealedCount ? d : "?"}
-              </span>
-            ))}
-          </div>
-          <p className="prompt-text">
-            Make a market on the final sum of all five dice. The interviewer knows the final sum
-            and will trade only when your market gives them edge.
-          </p>
-          <p className="prompt-sub">
-            Theoretical value is {fmt(theoretical)} from revealed sum {revealedSum} plus {remaining}
-            remaining dice at 3.5 each.
-          </p>
-
-          {!settled ? (
+          {phase === "quote" ? (
             <>
+              <PanelHead kicker="Quote the final five dice sum" title="A new die is showing" />
+              <div className="dice-strip" aria-label="Revealed dice">
+                {dice.map((d, i) => (
+                  <span key={i} className={`die ${i < revealedCount ? "" : "hidden"}`}>
+                    {i < revealedCount ? d : "?"}
+                  </span>
+                ))}
+              </div>
+              <p className="prompt-text">
+                Make a market on the total of all five dice. The interviewer knows the final sum and
+                trades only when your price gives them an edge. Keep your position, cash, and profit in
+                your head. You report them at the end.
+              </p>
+
               <div className="quote-form">
                 <label className="bidask bid">
                   <span>Bid</span>
@@ -210,69 +151,110 @@ export function FiveDiceMarket({
                   <input type="number" inputMode="decimal" value={ask} placeholder="you sell at" onChange={(e) => setAsk(e.target.value)} />
                 </label>
               </div>
-              {crossed ? <p className="quote-error">Bid must be at or below ask.</p> : null}
-              <button className="arena-start" onClick={submitQuote} disabled={!validQuote}>
-                Submit market
-              </button>
+              {crossed ? <p className="quote-error">Your bid cannot be higher than your ask.</p> : null}
+              <button className="arena-start" onClick={submitQuote} disabled={!validQuote}>Submit market</button>
+            </>
+          ) : phase === "quiz" ? (
+            <>
+              <PanelHead kicker="Checkpoint" title="Report your book from memory" />
+              <div className="dice-strip" aria-label="Final dice">
+                {dice.map((d, i) => <span key={i} className="die">{d}</span>)}
+              </div>
+              <p className="prompt-text">
+                All five dice are showing and the sum is locked in. Tell me where your book stands. Do
+                not scroll back, just answer from what you tracked.
+              </p>
+              <div className="memory-quiz-grid">
+                <label><span>Net position</span><input value={answers.pos} inputMode="numeric" onChange={(e) => setAnswers((a) => ({ ...a, pos: e.target.value }))} /></label>
+                <label><span>Cash</span><input value={answers.cash} inputMode="decimal" onChange={(e) => setAnswers((a) => ({ ...a, cash: e.target.value }))} /></label>
+                <label><span>Total profit</span><input value={answers.pnl} inputMode="decimal" onChange={(e) => setAnswers((a) => ({ ...a, pnl: e.target.value }))} /></label>
+              </div>
+              <button className="arena-start" onClick={() => setPhase("review")} disabled={!canGrade}>See the review</button>
             </>
           ) : (
-            <div className="summary-block">
-              <div className={`headline-score ${finalPnl >= 0 ? "good" : "bad"}`}>
-                <span>Final PnL</span>
+            <>
+              <PanelHead kicker="Review" title="What your book really was" />
+              <div className="headline-score">
+                <span>Final profit</span>
                 <strong className={finalPnl >= 0 ? "pos" : "neg"}>{fmtSigned(finalPnl)}</strong>
               </div>
-              <div className="stat-grid">
-                <Stat label="Final sum" value={String(finalSum)} tone="accent" />
-                <Stat label="Remaining position" value={fmtSigned(position)} tone={position === 0 ? "neutral" : "warn"} />
-                <Stat label="Cash ledger" value={fmtSigned(cash)} tone={cash >= 0 ? "good" : "bad"} />
+              <div className="memory-answer-list">
+                <div className={posOk ? "ok" : "miss"}><span>Net position</span><em>you {answers.pos || "."}</em><strong>{fmtSigned(position)}</strong></div>
+                <div className={cashOk ? "ok" : "miss"}><span>Cash</span><em>you {answers.cash || "."}</em><strong>{fmtSigned(cash)}</strong></div>
+                <div className={pnlOk ? "ok" : "miss"}><span>Total profit</span><em>you {answers.pnl || "."}</em><strong>{fmtSigned(finalPnl)}</strong></div>
               </div>
-              <button className="ghost-btn wide" onClick={reset}>
-                <RefreshCcw size={16} /> New five dice game
-              </button>
-            </div>
+              <div className="stat-grid two">
+                <Stat label="Final sum" value={String(finalSum)} tone="accent" />
+                <Stat label="Numbers you nailed" value={`${[posOk, cashOk, pnlOk].filter(Boolean).length} / 3`} tone="good" />
+              </div>
+              <button className="arena-start" onClick={reset}><RefreshCcw size={16} /> New game</button>
+            </>
           )}
         </Panel>
 
         <Panel>
-          <PanelHead kicker="Market-making theory" title="Value, last trade, position" />
-          <div className="stat-grid">
-            <Stat label="Theo" value={fmt(theoretical)} tone="accent" />
-            <Stat label="90% CI" value={`${fmt(ciLow)} to ${fmt(ciHigh)}`} tone="warn" />
-            <Stat label="Last price" value={lastTrade?.price == null ? "." : fmt(lastTrade.price)} />
-          </div>
-          <p className="implication" style={{ marginTop: 12 }}>{suggestedSkew}</p>
-          <p className="prompt-sub">
-            Wider markets reduce adverse trades, but absurd width gets no flow. If your position grows,
-            skew the whole market to invite the offsetting side.
-          </p>
-
-          <div className="history">
-            <span className="pnl-rail-title">Trade tape</span>
-            {trades.length === 0 ? (
-              <div className="locked-hint">No trades yet. Quote after each reveal and watch how inventory changes.</div>
-            ) : (
-              trades.slice().reverse().map((t) => {
-                const copy = actionCopy(t.action);
-                const tradePnl = t.action === "interviewer_buys"
-                  ? (t.price ?? 0) - finalSum
-                  : t.action === "interviewer_sells"
-                    ? finalSum - (t.price ?? 0)
-                    : 0;
-                return (
-                  <div key={t.round} className="history-row dice-history-row">
-                    <span>#{t.round}</span>
-                    <Pill tone={copy.tone}>{copy.label}</Pill>
-                    <span className="history-quote">
-                      {fmt(t.quote.bid)}/{fmt(t.quote.ask)} - pos {fmtSigned(t.positionAfter)}
-                    </span>
-                    <strong className={settled ? (tradePnl >= 0 ? "pos" : "neg") : ""}>
-                      {settled ? fmtSigned(tradePnl) : "open"}
-                    </strong>
-                  </div>
-                );
-              })
-            )}
-          </div>
+          {phase === "review" ? (
+            <>
+              <PanelHead kicker="Round by round" title="Your quote against fair value" />
+              <div className="ledger-table">
+                <div className="ledger-row head"><span>Dice</span><span>Fair</span><span>Your market</span><span>Result</span></div>
+                {trades.map((t) => {
+                  const copy = actionCopy(t.action);
+                  const mid = (t.quote.bid + t.quote.ask) / 2;
+                  const drift = mid - t.theo;
+                  const tradePnl = t.action === "interviewer_buys"
+                    ? (t.price ?? 0) - finalSum
+                    : t.action === "interviewer_sells"
+                      ? finalSum - (t.price ?? 0)
+                      : 0;
+                  return (
+                    <div key={t.round} className={`ledger-row ${t.action !== "pass" && tradePnl < 0 ? "breach" : ""}`}>
+                      <span>{t.revealed.join(" ")}{t.round < DICE_COUNT ? " ?" : ""}</span>
+                      <span>{fmt(t.theo)}</span>
+                      <span>{fmt(t.quote.bid)} / {fmt(t.quote.ask)}{Math.abs(drift) >= 1 ? (drift > 0 ? " high" : " low") : ""}</span>
+                      <span>{copy.label.replace("They ", "")}{t.action !== "pass" ? ` ${fmtSigned(tradePnl)}` : ""}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="implication" style={{ marginTop: 12 }}>
+                Fair value each round is the revealed sum plus 3.5 for every hidden die. A market centred
+                on fair with a sensible width is hard to pick off. When your midpoint drifts from fair,
+                the interviewer takes the cheap side.
+              </p>
+            </>
+          ) : (
+            <>
+              <PanelHead kicker="Your job while you play" title="Hold the book in your head" />
+              <p className="implication">
+                Nothing here gives away the answer. Work out fair value yourself: it is the revealed sum
+                plus 3.5 for each die still hidden. Then quote a market you would be happy to get hit on.
+              </p>
+              <p className="prompt-sub">
+                When they buy your ask you get shorter and take in cash. When they sell your bid you get
+                longer and pay out cash. Keep a running count of your position, your cash, and your profit.
+                You report all three once the last die lands.
+              </p>
+              <div className="history">
+                <span className="pnl-rail-title">Trade tape</span>
+                {trades.length === 0 ? (
+                  <div className="locked-hint">No trades yet. Quote after each die and read what the interviewer does.</div>
+                ) : (
+                  trades.slice().reverse().map((t) => {
+                    const copy = actionCopy(t.action);
+                    return (
+                      <div key={t.round} className="history-row dice-history-row">
+                        <span>#{t.round}</span>
+                        <Pill tone={copy.tone}>{copy.label}</Pill>
+                        <span className="history-quote">{fmt(t.quote.bid)} / {fmt(t.quote.ask)}</span>
+                        <strong>{t.price == null ? "." : fmt(t.price)}</strong>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </>
+          )}
         </Panel>
       </div>
     </div>

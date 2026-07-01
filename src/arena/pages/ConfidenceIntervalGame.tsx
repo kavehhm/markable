@@ -4,6 +4,7 @@ import { ArenaSession } from "../ArenaApp";
 import { Panel, PanelHead, Pill, Stat } from "../components/ui";
 import { fmt } from "../format";
 import { Topline } from "../components/ui";
+import { GameRules } from "../components/gameRules";
 
 type CiPrompt = {
   id: string;
@@ -108,7 +109,7 @@ export function ConfidenceIntervalGame({
 
   return (
     <div className="arena-shell">
-      <Topline title="Confidence Interval" onExit={onExit} right={<span className="cp-chip">target 90%</span>} />
+      <Topline title="Confidence Interval" onExit={onExit} rules={<GameRules game="confidence_interval" />} right={<span className="cp-chip">target 90%</span>} />
 
       <div className="play-grid">
         <Panel className="prompt-panel">

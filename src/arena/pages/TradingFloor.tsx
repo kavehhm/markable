@@ -11,6 +11,7 @@ import {
   tradePnl,
 } from "../engine";
 import { Panel, PanelHead, Pill, Stat, Topline } from "../components/ui";
+import { GameRules } from "../components/gameRules";
 import { fmt, fmtSigned } from "../format";
 
 type Difficulty = "easy" | "medium" | "hard" | "custom";
@@ -132,7 +133,7 @@ export function TradingFloor({ onExit }: { onExit: () => void }) {
     const balHits = logs.filter((l) => l.balOk).length;
     return (
       <div className="arena-shell">
-        <Topline title="Trading Floor" onExit={onExit} right={<span className="cp-chip">{source}</span>} />
+        <Topline title="Trading Floor" onExit={onExit} rules={<GameRules game="trade_floor" />} right={<span className="cp-chip">{source}</span>} />
         <Panel className="prompt-panel">
           <PanelHead kicker="Session review" title="How you traded the maker" />
           <div className="headline-score">
@@ -176,6 +177,7 @@ export function TradingFloor({ onExit }: { onExit: () => void }) {
       <Topline
         title="Trading Floor"
         onExit={onExit}
+        rules={<GameRules game="trade_floor" />}
         right={
           <span className="topline-tags">
             <span className="cp-chip">{source}</span>
@@ -379,7 +381,7 @@ function SetupScreen(props: {
   const unitNoun = source === "cards" ? "cards" : "dice";
   return (
     <div className="arena-shell">
-      <Topline title="Trading Floor" onExit={onExit} />
+      <Topline title="Trading Floor" onExit={onExit} rules={<GameRules game="trade_floor" />} />
       <Panel className="tg-setup">
         <PanelHead kicker="Settings" title="Beat the market maker" right={<Settings2 size={18} className="hint-icon" />} />
 

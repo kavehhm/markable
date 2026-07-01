@@ -3,6 +3,7 @@ import {
   ArrowRight,
   Binary,
   BrainCircuit,
+  Calculator,
   Dice5,
   Lightbulb,
   LineChart,
@@ -15,7 +16,8 @@ import { Difficulty, LAB_SCENARIOS, INFERENCE_SCENARIOS, findInferenceScenario }
 import { ArenaMode, ArenaSession } from "../ArenaApp";
 
 const MODES: Array<{ id: ArenaMode; title: string; blurb: string; Icon: typeof Target }> = [
-  { id: "make_market", title: "Make a Market", blurb: "Browse the bank, quote a hidden payoff, trade and review. Folds in fair value drills.", Icon: Scale },
+  { id: "make_market", title: "Make a Market", blurb: "Pick a contract, quote a two sided market, and trade against a counterparty.", Icon: Scale },
+  { id: "fair_value", title: "Fair Value", blurb: "Work through a bank of estimation questions and check your number against the answer.", Icon: Calculator },
   { id: "trade_floor", title: "Trading Floor", blurb: "Beat a random market maker quote on hidden cards or dice. Budget, timer, and events.", Icon: LineChart },
   { id: "inference", title: "Hidden State Inference", blurb: "Quote against an informed desk, narrow the hidden state, then guess it.", Icon: Search },
   { id: "fermi", title: "Fermi Markets", blurb: "Make repeated markets on real world quantities, manage inventory, settle PnL.", Icon: Lightbulb },

@@ -15,6 +15,7 @@ import {
 } from "../engine";
 import { ArenaSession } from "../ArenaApp";
 import { OutcomeView } from "../components/OutcomeView";
+import { GameRules } from "../components/gameRules";
 import { Panel, PanelHead, Pill, Stat, Topline } from "../components/ui";
 import { fmt, fmtSigned, pct } from "../format";
 
@@ -124,6 +125,7 @@ export function HiddenInference({ session, onExit }: { session: ArenaSession; on
       <Topline
         title="Hidden State Inference"
         onExit={onExit}
+        rules={<GameRules game="inference" />}
         right={
           <span className="topline-tags">
             <span className="cp-chip">{scenario.difficulty}</span>
