@@ -85,6 +85,8 @@ type InferenceMarket = {
   productAsk: number;
 };
 
+type InferenceMarketInput = Record<keyof InferenceMarket, string>;
+
 type InferenceRound = InferenceMarket & {
   round: number;
   expired: boolean;
@@ -97,6 +99,8 @@ type InferenceGuess = {
   b: number;
   c: number;
 };
+
+type InferenceGuessInput = Record<keyof InferenceGuess, string>;
 
 function readProgress(): Progress {
   try {
@@ -188,6 +192,12 @@ function sumValues(values: number[]) {
 
 function productValues(values: number[]) {
   return values.reduce((product, value) => product * value, 1);
+}
+
+function parseInferenceInput(value: string) {
+  if (value === "" || value === "-") return 0;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function formatInteger(value: number) {
@@ -674,26 +684,31 @@ function InferenceGame() {
   const [phase, setPhase] = useState<InferencePhase>("ready");
   const [round, setRound] = useState(1);
   const [timeLeft, setTimeLeft] = useState(35);
-  const [market, setMarket] = useState<InferenceMarket>({
-    sumBid: -50,
-    sumAsk: 50,
-    productBid: -100000,
-    productAsk: 100000,
+  const [market, setMarket] = useState<InferenceMarketInput>({
+    sumBid: "-50",
+    sumAsk: "50",
+    productBid: "-100000",
+    productAsk: "100000",
   });
   const [rounds, setRounds] = useState<InferenceRound[]>([]);
-  const [guess, setGuess] = useState<InferenceGuess>({ a: 0, b: 0, c: 0 });
+  const [guess, setGuess] = useState<InferenceGuessInput>({ a: "", b: "", c: "" });
   const phaseRef = useRef<InferencePhase>(phase);
-  const marketRef = useRef<InferenceMarket>(market);
-  const guessRef = useRef<InferenceGuess>(guess);
+  const marketRef = useRef<InferenceMarketInput>(market);
+  const guessRef = useRef<InferenceGuessInput>(guess);
   const windowClosedRef = useRef(false);
   const trueSum = sumValues(hidden);
   const trueProduct = productValues(hidden);
   const boundsLabel = `[-${bound}, ${bound}]`;
   const sortedHidden = sortedValues(hidden);
-  const sortedGuess = sortedValues([guess.a, guess.b, guess.c]);
+  const numericGuess = {
+    a: parseInferenceInput(guess.a),
+    b: parseInferenceInput(guess.b),
+    c: parseInferenceInput(guess.c),
+  };
+  const sortedGuess = sortedValues([numericGuess.a, numericGuess.b, numericGuess.c]);
   const valueError = sortedHidden.reduce((sum, value, index) => sum + Math.abs(value - sortedGuess[index]), 0);
-  const guessedSum = guess.a + guess.b + guess.c;
-  const guessedProduct = guess.a * guess.b * guess.c;
+  const guessedSum = numericGuess.a + numericGuess.b + numericGuess.c;
+  const guessedProduct = numericGuess.a * numericGuess.b * numericGuess.c;
 
   useEffect(() => {
     phaseRef.current = phase;
@@ -717,12 +732,12 @@ function InferenceGame() {
     setTimeLeft(35);
     setRounds([]);
     setMarket({
-      sumBid: -50,
-      sumAsk: 50,
-      productBid: -100000,
-      productAsk: 100000,
+      sumBid: "-50",
+      sumAsk: "50",
+      productBid: "-100000",
+      productAsk: "100000",
     });
-    setGuess({ a: 0, b: 0, c: 0 });
+    setGuess({ a: "", b: "", c: "" });
   }
 
   function startGame() {
@@ -733,11 +748,17 @@ function InferenceGame() {
     if (phaseRef.current !== "market" || windowClosedRef.current) return;
     windowClosedRef.current = true;
     const current = marketRef.current;
+    const numericMarket = {
+      sumBid: parseInferenceInput(current.sumBid),
+      sumAsk: parseInferenceInput(current.sumAsk),
+      productBid: parseInferenceInput(current.productBid),
+      productAsk: parseInferenceInput(current.productAsk),
+    };
     const normalized = {
-      sumBid: Math.min(current.sumBid, current.sumAsk),
-      sumAsk: Math.max(current.sumBid, current.sumAsk),
-      productBid: Math.min(current.productBid, current.productAsk),
-      productAsk: Math.max(current.productBid, current.productAsk),
+      sumBid: Math.min(numericMarket.sumBid, numericMarket.sumAsk),
+      sumAsk: Math.max(numericMarket.sumBid, numericMarket.sumAsk),
+      productBid: Math.min(numericMarket.productBid, numericMarket.productAsk),
+      productAsk: Math.max(numericMarket.productBid, numericMarket.productAsk),
     };
     const entry: InferenceRound = {
       ...normalized,
@@ -748,7 +769,12 @@ function InferenceGame() {
     };
 
     setRounds((currentRounds) => [...currentRounds, entry]);
-    setMarket(normalized);
+    setMarket({
+      sumBid: String(normalized.sumBid),
+      sumAsk: String(normalized.sumAsk),
+      productBid: String(normalized.productBid),
+      productAsk: String(normalized.productAsk),
+    });
 
     if (round >= 3) {
       setPhase("guess");
@@ -782,17 +808,19 @@ function InferenceGame() {
     return () => window.clearInterval(id);
   }, [gameId, phase, round]);
 
-  function updateMarket(key: keyof InferenceMarket, value: number) {
+  function updateMarket(key: keyof InferenceMarket, value: string) {
+    if (!/^-?\d*$/.test(value)) return;
     setMarket((current) => ({
       ...current,
-      [key]: Number.isFinite(value) ? value : 0,
+      [key]: value,
     }));
   }
 
-  function updateGuess(key: keyof InferenceGuess, value: number) {
+  function updateGuess(key: keyof InferenceGuess, value: string) {
+    if (!/^-?\d*$/.test(value)) return;
     setGuess((current) => ({
       ...current,
-      [key]: Number.isFinite(value) ? value : 0,
+      [key]: value,
     }));
   }
 
@@ -842,19 +870,19 @@ function InferenceGame() {
             <div className="market-form-grid">
               <label>
                 <span>Sum bid</span>
-                <input type="number" value={market.sumBid} onChange={(event) => updateMarket("sumBid", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={market.sumBid} onChange={(event) => updateMarket("sumBid", event.currentTarget.value)} />
               </label>
               <label>
                 <span>Sum ask</span>
-                <input type="number" value={market.sumAsk} onChange={(event) => updateMarket("sumAsk", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={market.sumAsk} onChange={(event) => updateMarket("sumAsk", event.currentTarget.value)} />
               </label>
               <label>
                 <span>Product bid</span>
-                <input type="number" value={market.productBid} onChange={(event) => updateMarket("productBid", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={market.productBid} onChange={(event) => updateMarket("productBid", event.currentTarget.value)} />
               </label>
               <label>
                 <span>Product ask</span>
-                <input type="number" value={market.productAsk} onChange={(event) => updateMarket("productAsk", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={market.productAsk} onChange={(event) => updateMarket("productAsk", event.currentTarget.value)} />
               </label>
             </div>
 
@@ -876,15 +904,15 @@ function InferenceGame() {
             <div className="guess-grid">
               <label>
                 <span>Value 1</span>
-                <input type="number" value={guess.a} onChange={(event) => updateGuess("a", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={guess.a} onChange={(event) => updateGuess("a", event.currentTarget.value)} />
               </label>
               <label>
                 <span>Value 2</span>
-                <input type="number" value={guess.b} onChange={(event) => updateGuess("b", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={guess.b} onChange={(event) => updateGuess("b", event.currentTarget.value)} />
               </label>
               <label>
                 <span>Value 3</span>
-                <input type="number" value={guess.c} onChange={(event) => updateGuess("c", Number(event.currentTarget.value))} />
+                <input type="text" inputMode="numeric" value={guess.c} onChange={(event) => updateGuess("c", event.currentTarget.value)} />
               </label>
             </div>
 
